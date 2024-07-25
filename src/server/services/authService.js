@@ -17,9 +17,7 @@ module.exports.createAccessToken = async function (payload) {
 module.exports.checkAccessToken = async function (token) {
   try {
     const secretKey = getSecretKey()
-    const verify_data = jwt.verify(token, secretKey)
-    const DOMAIN = process.env.DOMAIN || 'localhost'
-    return verify_data?.email?.includes(DOMAIN) || false;
+    return jwt.verify(token, secretKey)
   } catch (err) {
     return null
   }

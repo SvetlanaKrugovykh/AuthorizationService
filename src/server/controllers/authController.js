@@ -19,11 +19,13 @@ module.exports.checkAccessToken = async function (request, _reply) {
   const { token } = request.body
   const decodedToken = await authService.checkAccessToken(token)
 
-  if (!decodedToken) {
+  const DOMAIN = process.env.DOMAIN || 'localhost'
+  const addControl = decodedToken?.email?.includes(DOMAIN) || false;
+  if (!decodedToken || !addControl) {
     throw new HttpError[401]('Invalid token: Authorization failed')
   } else {
     return {
-      valid: true, data: decodedToken
+      decodedToken
     }
   }
 }
