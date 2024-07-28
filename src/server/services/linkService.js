@@ -1,6 +1,7 @@
 const axios = require('axios')
 const https = require('https')
 const jwt = require('jsonwebtoken')
+const FormData = require('form-data')
 const crypto = require('crypto')
 const fs = require('fs')
 const { getSecretKey } = require('../guards/getCredentials')
@@ -37,25 +38,17 @@ module.exports.doLinkServiceJson = async function (relayData) {
 
 module.exports.doLinkServiceMultipart = async function (relayData) {
   try {
-    const { request, linkData, clientId, email, token } = relayData
+    const { request, linkData, clientId, email, token, file } = relayData
     const secretKey = getSecretKey()
     const jwtData = jwt.verify(token, secretKey)
+
     if (jwtData.clientId !== clientId || jwtData.serviceId !== linkData.serviceId) {
       return null
     }
 
-    const FormData = require('form-data')
-
     const formData = new FormData()
-    for (const key in request.body) {
-      if (request.body.hasOwnProperty(key)) {
-        const value = request.body[key]
-        if (value instanceof Buffer || value instanceof Stream) {
-          formData.append(key, value, { filename: key })
-        } else {
-          formData.append(key, value)
-        }
-      }
+    if (file) {
+      formData.append('file', file.buffer, { filename: file.originalname })
     }
 
     const agent = new https.Agent({

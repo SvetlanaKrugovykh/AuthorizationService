@@ -29,7 +29,7 @@ module.exports.linkThroughJson = async function (request, _reply) {
 
 module.exports.linkThroughMultipart = async function (request, _reply) {
   const parts = request.parts()
-  let serviceId, clientId, segment, token, file, linkData
+  let serviceId, clientId, segment, token, file, linkData, originalname
 
   try {
     for await (const part of parts) {
@@ -47,6 +47,7 @@ module.exports.linkThroughMultipart = async function (request, _reply) {
         token = part.value
       } else if (part.fieldname === 'file') {
         file = part.file
+        originalname = part.filename || 'file'
         const chunks = []
         for await (const chunk of file) {
           chunks.push(chunk)
@@ -68,7 +69,10 @@ module.exports.linkThroughMultipart = async function (request, _reply) {
     clientId,
     segment,
     token,
-    file
+    file: {
+      buffer: file,
+      originalname: originalname
+    }
   }
   const replyData = await linkService.doLinkServiceMultipart(relayData)
 
