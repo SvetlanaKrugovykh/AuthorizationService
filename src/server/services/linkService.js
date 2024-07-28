@@ -18,6 +18,8 @@ module.exports.doLinkServiceJson = async function (relayData) {
       rejectUnauthorized: false
     })
 
+    console.log('linkData.url', linkData.url)
+    console.log('request.body', request.body)
     const response = await axios.post(linkData.url, request.body, {
       headers: {
         ...request.headers,
@@ -59,6 +61,9 @@ module.exports.doLinkServiceMultipart = async function (relayData) {
     const agent = new https.Agent({
       rejectUnauthorized: false
     })
+
+    console.log('linkData.url', linkData.url)
+    console.log('request.body', request.body)
 
     const response = await axios.post(linkData.url, formData, {
       headers: {
