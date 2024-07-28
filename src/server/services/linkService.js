@@ -1,4 +1,5 @@
 const axios = require('axios')
+const https = require('https')
 const jwt = require('jsonwebtoken')
 const crypto = require('crypto')
 const fs = require('fs')
@@ -12,11 +13,17 @@ module.exports.doLinkServiceJson = async function (relayData) {
     if (jwtData.clientId !== clientId || jwtData.serviceId !== linkData.serviceId) {
       return null
     }
+
+    const agent = new https.Agent({
+      rejectUnauthorized: false
+    })
+
     const response = await axios.post(linkData.url, request.body, {
       headers: {
         ...request.headers,
         'Content-Type': 'application/json'
-      }
+      },
+      httpsAgent: agent
     })
 
     return response.data
@@ -49,11 +56,16 @@ module.exports.doLinkServiceMultipart = async function (relayData) {
       }
     }
 
+    const agent = new https.Agent({
+      rejectUnauthorized: false
+    })
+
     const response = await axios.post(linkData.url, formData, {
       headers: {
         ...request.headers,
         ...formData.getHeaders()
-      }
+      },
+      httpsAgent: agent
     })
 
     return response.data

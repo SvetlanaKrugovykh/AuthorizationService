@@ -1,7 +1,7 @@
 {
 	"dependencies": {
 		"@fastify/multipart": "^6.0.0",
-		"axios": "^1.6.8",
+		"axios": "^1.7.2",
 		"crypto": "^1.0.1",
 		"dotenv": "^16.4.5",
 		"fastify": "^4.25.2",
