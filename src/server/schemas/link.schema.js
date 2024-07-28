@@ -16,7 +16,7 @@ module.exports = {
       clientId: { type: 'string' },
       token: { type: 'string' }
     },
-    required: ['token, serviceId']
+    required: ['serviceId', 'token']
   },
   response: {
     201: {
