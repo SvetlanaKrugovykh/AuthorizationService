@@ -29,30 +29,37 @@ module.exports.linkThroughJson = async function (request, _reply) {
 
 module.exports.linkThroughMultipart = async function (request, _reply) {
   const parts = request.parts()
-  let serviceId, clientId, segment, token, file
+  let serviceId, clientId, segment, token, file, linkData
 
-  for await (const part of parts) {
-    if (part.fieldname === 'serviceId') {
-      serviceId = part.value
-    } else if (part.fieldname === 'clientId') {
-      clientId = part.value
-    } else if (part.fieldname === 'segment') {
-      segment = part.value
-    } else if (part.fieldname === 'token') {
-      token = part.value
-    } else if (part.fieldname === 'file') {
-      file = part.file
+  try {
+    for await (const part of parts) {
+      if (part.fieldname === 'serviceId') {
+        serviceId = part.value
+        linkData = links.find(link => link.serviceId === serviceId)
+        if (!linkData) {
+          throw new HttpError[404]('Link not found')
+        }
+      } else if (part.fieldname === 'clientId') {
+        clientId = part.value
+      } else if (part.fieldname === 'segment') {
+        segment = part.value
+      } else if (part.fieldname === 'token') {
+        token = part.value
+      } else if (part.fieldname === 'file') {
+        file = part.file
+        const chunks = []
+        for await (const chunk of file) {
+          chunks.push(chunk)
+        }
+        file = Buffer.concat(chunks)
+      }
     }
+  } catch (err) {
+    throw new HttpError[400]('Error processing multipart data')
   }
 
   if (!serviceId || !clientId || !segment || !token || !file) {
     throw new HttpError[400]('Missing required fields')
-  }
-
-  const linkData = links.find(link => link.serviceId === serviceId)
-
-  if (!linkData) {
-    throw new HttpError[404]('Link not found')
   }
 
   const relayData = {
@@ -63,7 +70,7 @@ module.exports.linkThroughMultipart = async function (request, _reply) {
     token,
     file
   }
-  const replyData = await linkService.doLinkService(relayData)
+  const replyData = await linkService.doLinkServiceMultipart(relayData)
 
   if (!replyData) {
     throw new HttpError[500]('Command execution failed')

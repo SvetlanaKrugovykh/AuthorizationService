@@ -17,6 +17,8 @@ const app = Fastify({
 })
 
 app.register(require('@fastify/multipart'))
+app.addContentTypeParser('application/json', { parseAs: 'string' }, app.getDefaultJsonParser('ignore', 'ignore'))
+
 app.register(authPlugin)
 
 // Register routes

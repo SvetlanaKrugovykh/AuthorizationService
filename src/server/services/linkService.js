@@ -13,10 +13,13 @@ module.exports.doLinkServiceJson = async function (relayData) {
       return null
     }
     const response = await axios.post(linkData.url, request.body, {
-      headers: request.headers
+      headers: {
+        ...request.headers,
+        'Content-Type': 'application/json'
+      }
     })
 
-    return response.data;
+    return response.data
   } catch (err) {
     return null
   }
@@ -31,11 +34,29 @@ module.exports.doLinkServiceMultipart = async function (relayData) {
     if (jwtData.clientId !== clientId || jwtData.serviceId !== linkData.serviceId) {
       return null
     }
-    const response = await axios.post(linkData.url, request.body, {
-      headers: request.headers
+
+    const FormData = require('form-data')
+
+    const formData = new FormData()
+    for (const key in request.body) {
+      if (request.body.hasOwnProperty(key)) {
+        const value = request.body[key]
+        if (value instanceof Buffer || value instanceof Stream) {
+          formData.append(key, value, { filename: key })
+        } else {
+          formData.append(key, value)
+        }
+      }
+    }
+
+    const response = await axios.post(linkData.url, formData, {
+      headers: {
+        ...request.headers,
+        ...formData.getHeaders()
+      }
     })
 
-    return response.data;
+    return response.data
   } catch (err) {
     return null
   }
