@@ -2,8 +2,8 @@ const HttpError = require('http-errors')
 const authService = require('../services/authService')
 
 module.exports.createAccessToken = async function (request, _reply) {
-  const { clientId, email } = request.body
-  const payload = { clientId, email }
+  const { serviceId, clientId, email } = request.body
+  const payload = { serviceId, clientId, email }
   const token = await authService.createAccessToken(payload)
 
   if (!token) {

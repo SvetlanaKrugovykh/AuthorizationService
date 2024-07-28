@@ -5,7 +5,7 @@ const { getSecretKey } = require('../guards/getCredentials')
 
 module.exports.createAccessToken = async function (payload) {
   if (process.env.ACCEPT_CREATING_ACCESS_TOKENS === 'true') {
-    const expDays = process.env.TOKER_EXPIRE_IN_DAYS || 1
+    const expDays = process.env.TOKEN_EXPIRE_IN_DAYS || 1
     const expiresIn = expDays * 24 * 3600
     const secretKey = getSecretKey()
     return jwt.sign(payload, secretKey, { expiresIn })
