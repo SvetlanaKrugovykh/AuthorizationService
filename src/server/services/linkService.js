@@ -1,32 +1,23 @@
 const axios = require('axios')
-const https = require('https')
 const jwt = require('jsonwebtoken')
 const FormData = require('form-data')
-const crypto = require('crypto')
-const fs = require('fs')
 const { getSecretKey } = require('../guards/getCredentials')
 
 module.exports.doLinkServiceJson = async function (relayData) {
   try {
-    const { request, linkData, clientId, email, token } = relayData
+    const { request, linkData, clientId: relayClientId, token: relayToken } = relayData
     const secretKey = getSecretKey()
-    const jwtData = jwt.verify(token, secretKey)
-    if (jwtData.clientId !== clientId || jwtData.serviceId !== linkData.serviceId) {
+    const jwtData = jwt.verify(relayToken, secretKey)
+    if (jwtData.clientId !== relayClientId || jwtData.serviceId !== linkData.serviceId) {
       return null
     }
 
-    const agent = new https.Agent({
-      rejectUnauthorized: false
-    })
+    const { serviceId, clientId, email, token, ...filteredBody } = request.body
 
-    console.log('linkData.url', linkData.url)
-    console.log('request.body', request.body)
-    const response = await axios.post(linkData.url, request.body, {
+    const response = await axios.post(linkData.url, filteredBody, {
       headers: {
-        ...request.headers,
         'Content-Type': 'application/json'
-      },
-      httpsAgent: agent
+      }
     })
 
     return response.data
@@ -61,7 +52,7 @@ module.exports.doLinkServiceMultipart = async function (relayData) {
     const response = await axios.post(linkData.url, formData, {
       headers: {
         ...request.headers,
-        ...formData.getHeaders()
+        'Content-Type': `multipart/form-data; boundary=${formData._boundary}`
       },
       httpsAgent: agent
     })
