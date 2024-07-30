@@ -33,6 +33,7 @@ module.exports.doLinkServiceJson = async function (relayData) {
 module.exports.doLinkServiceMultipart = async function (relayData) {
   try {
     const { linkData, clientId: relayClientId, token: relayToken, file } = relayData
+    const segment_number = relayData?.segment || '1'
 
     const secretKey = getSecretKey()
     const jwtData = jwt.verify(relayToken, secretKey)
@@ -44,6 +45,8 @@ module.exports.doLinkServiceMultipart = async function (relayData) {
     if (file) {
       formData.append('file', file.buffer, { filename: file.originalname })
     }
+    formData.append('segment_number', segment_number)
+    formData.append('clientId', relayClientId)
 
     const startTime = Date.now()
     const response = await axios.post(linkData.url, formData, {
