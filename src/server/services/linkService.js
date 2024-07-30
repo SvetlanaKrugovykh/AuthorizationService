@@ -14,11 +14,14 @@ module.exports.doLinkServiceJson = async function (relayData) {
 
     const { serviceId, clientId, email, token, ...filteredBody } = request.body
 
+    const startTime = Date.now()
     const response = await axios.post(linkData.url, filteredBody, {
       headers: {
         'Content-Type': 'application/json'
       }
     })
+    const endTime = Date.now()
+    console.log(`${endTime}: JSON request duration: ${endTime - startTime}ms`)
 
     return response.data
   } catch (err) {
@@ -42,11 +45,14 @@ module.exports.doLinkServiceMultipart = async function (relayData) {
       formData.append('file', file.buffer, { filename: file.originalname })
     }
 
+    const startTime = Date.now()
     const response = await axios.post(linkData.url, formData, {
       headers: {
         'Content-Type': `multipart/form-data; boundary=${formData._boundary}`
       }
     })
+    const endTime = Date.now()
+    console.log(`${endTime}: Multipart request duration: ${endTime - startTime}ms`)
 
     return response.data
   } catch (err) {
