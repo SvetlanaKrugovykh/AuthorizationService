@@ -15,6 +15,7 @@ module.exports.doLinkServiceJson = async function (relayData) {
     const { serviceId, clientId, email, token, ...filteredBody } = request.body
 
     const startTime = Date.now()
+    console.log(`${startTime}: JSON request start`)
     const response = await axios.post(linkData.url, filteredBody, {
       headers: {
         'Content-Type': 'application/json'
@@ -28,7 +29,6 @@ module.exports.doLinkServiceJson = async function (relayData) {
     return null
   }
 }
-
 
 module.exports.doLinkServiceMultipart = async function (relayData) {
   try {
@@ -49,6 +49,7 @@ module.exports.doLinkServiceMultipart = async function (relayData) {
     formData.append('clientId', relayClientId)
 
     const startTime = Date.now()
+    console.log(`${startTime}: Multipart request start`)
     const response = await axios.post(linkData.url, formData, {
       headers: {
         'Content-Type': `multipart/form-data; boundary=${formData._boundary}`
