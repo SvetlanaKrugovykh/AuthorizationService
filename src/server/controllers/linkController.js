@@ -29,7 +29,7 @@ module.exports.linkThroughJson = async function (request, _reply) {
 
 module.exports.linkThroughMultipart = async function (request, _reply) {
   const parts = request.parts()
-  let serviceId, clientId, segment, token, file, linkData, originalname
+  let serviceId, clientId, segment_number, token, file, linkData, originalname
 
   try {
     for await (const part of parts) {
@@ -41,8 +41,8 @@ module.exports.linkThroughMultipart = async function (request, _reply) {
         }
       } else if (part.fieldname === 'clientId') {
         clientId = part.value
-      } else if (part.fieldname === 'segment') {
-        segment = part.value
+      } else if (part.fieldname === 'segment_number') {
+        segment_number = part.value
       } else if (part.fieldname === 'token') {
         token = part.value
       } else if (part.fieldname === 'file') {
@@ -59,7 +59,7 @@ module.exports.linkThroughMultipart = async function (request, _reply) {
     throw new HttpError[400]('Error processing multipart data')
   }
 
-  if (!serviceId || !clientId || !segment || !token || !file) {
+  if (!serviceId || !clientId || !segment_number || !token || !file) {
     throw new HttpError[400]('Missing required fields')
   }
 
@@ -67,7 +67,7 @@ module.exports.linkThroughMultipart = async function (request, _reply) {
     request,
     linkData,
     clientId,
-    segment,
+    segment_number,
     token,
     file: {
       buffer: file,
