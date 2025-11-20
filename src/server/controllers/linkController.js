@@ -1,6 +1,9 @@
 
 const path = require('path')
 const fs = require('fs')
+const doConvertXlsx = require('../services/xlsxService')
+require('dotenv').config()
+
 
 // XLSX processing
 exports.linkThroughXlsx = async (req, reply) => {
@@ -17,12 +20,11 @@ exports.linkThroughXlsx = async (req, reply) => {
     const filePath = path.join(tempDir, data.filename)
     await data.toFile(filePath)
 
-    // TODO: Implement real XLSX processing
-    // stub: just return file path or link
     if (variant === '1') {
       // Option 1: return file
+      const convertedFilePath = await doConvertXlsx.doConvertXlsx(filePath)
       reply.header('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet')
-      reply.send(fs.createReadStream(filePath))
+      reply.send(fs.createReadStream(convertedFilePath))
     } else if (variant === '2') {
       // Option 2: return Google Drive link (stub for now)
       const driveUrl = 'https://drive.google.com/link/' + data.filename
