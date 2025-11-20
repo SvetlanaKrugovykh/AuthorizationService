@@ -5,7 +5,11 @@ require('dotenv').config()
 
 module.exports.doConvertXlsx = async function (inputFilePath) {
   // Determine output directory and file name
-  const outDir = process.env.XLSX_OUT || path.join(__dirname, '../../temp')
+  let outDir = process.env.XLSX_OUT || path.join(__dirname, '../../temp')
+  // If XLSX_OUT is set, ensure absolute path is created
+  if (process.env.XLSX_OUT) {
+    outDir = path.isAbsolute(process.env.XLSX_OUT) ? process.env.XLSX_OUT : path.resolve(process.env.XLSX_OUT)
+  }
   if (!fs.existsSync(outDir)) fs.mkdirSync(outDir, { recursive: true })
   const outputFileName = path.basename(inputFilePath)
   const outputFilePath = path.join(outDir, outputFileName)

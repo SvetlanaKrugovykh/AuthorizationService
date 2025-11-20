@@ -14,8 +14,12 @@ exports.linkThroughXlsx = async (req, reply) => {
       reply.code(400).send({ error: 'No file uploaded' })
       return
     }
-    // Save file to temporary folder
-    const tempDir = process.env.XLSX_IN || path.join(__dirname, '../temp')
+    // Save file to input folder
+    let tempDir = process.env.XLSX_IN || path.join(__dirname, '../temp')
+    // If XLSX_IN is set, ensure absolute path is created
+    if (process.env.XLSX_IN) {
+      tempDir = path.isAbsolute(process.env.XLSX_IN) ? process.env.XLSX_IN : path.resolve(process.env.XLSX_IN)
+    }
     if (!fs.existsSync(tempDir)) fs.mkdirSync(tempDir, { recursive: true })
     const filePath = path.join(tempDir, data.filename)
     await data.toFile(filePath)
