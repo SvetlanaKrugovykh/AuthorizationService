@@ -1,3 +1,39 @@
+
+const path = require('path')
+const fs = require('fs')
+
+// XLSX processing
+exports.linkThroughXlsx = async (req, reply) => {
+  try {
+    const data = await req.file()
+    const variant = req.body?.variant || '1'
+    if (!data) {
+      reply.code(400).send({ error: 'No file uploaded' })
+      return
+    }
+    // Save file to temporary folder
+    const tempDir = process.env.XLSX_IN || path.join(__dirname, '../temp')
+    if (!fs.existsSync(tempDir)) fs.mkdirSync(tempDir, { recursive: true })
+    const filePath = path.join(tempDir, data.filename)
+    await data.toFile(filePath)
+
+    // TODO: Implement real XLSX processing
+    // stub: just return file path or link
+    if (variant === '1') {
+      // Option 1: return file
+      reply.header('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet')
+      reply.send(fs.createReadStream(filePath))
+    } else if (variant === '2') {
+      // Option 2: return Google Drive link (stub for now)
+      const driveUrl = 'https://drive.google.com/link/' + data.filename
+      reply.send({ url: driveUrl })
+    } else {
+      reply.code(400).send({ error: 'Unknown variant' })
+    }
+  } catch (err) {
+    reply.code(500).send({ error: err.message })
+  }
+}
 const HttpError = require('http-errors')
 const linkService = require('../services/linkService')
 const links = require('../data/links.model').links
@@ -59,6 +95,7 @@ module.exports.linkThroughMultipart = async function (request, _reply) {
     throw new HttpError[400]('Error processing multipart data')
   }
 
+  // Check required fields
   if (!serviceId || !clientId || !segment_number || !token || !file) {
     throw new HttpError[400]('Missing required fields')
   }
