@@ -21,11 +21,13 @@ exports.linkThroughXlsx = async (req, reply) => {
     }
     if (!fs.existsSync(tempDir)) fs.mkdirSync(tempDir, { recursive: true })
     const filePath = path.join(tempDir, data.filename)
-    const writeStream = fs.createWriteStream(filePath)
-    for await (const chunk of data.file) {
-      writeStream.write(chunk)
-    }
-    writeStream.end()
+    // Write file using pipe for correct stream handling
+    await new Promise((resolve, reject) => {
+      const writeStream = fs.createWriteStream(filePath)
+      data.file.pipe(writeStream)
+      writeStream.on('finish', resolve)
+      writeStream.on('error', reject)
+    })
 
     if (variant === '1') {
       // Option 1: return file
