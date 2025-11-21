@@ -45,9 +45,14 @@ exports.linkThroughXlsx = async (req, reply) => {
     }
 
     if (variant === '2') {
-      // Return Google Drive link (stub)
-      const driveUrl = 'https://drive.google.com/link/' + encodeURIComponent(fileName)
-      reply.send({ url: driveUrl })
+      // Upload to Google Drive and return real link
+      const { uploadFileToDrive } = require('../services/googleDiskService')
+      try {
+        const driveUrl = await uploadFileToDrive(convertedFilePath, fileName)
+        reply.send({ url: driveUrl })
+      } catch (err) {
+        reply.code(500).send({ error: 'Google Drive upload failed: ' + err.message })
+      }
     } else if (variant === '1' && forceLink) {
       // Return HTTPS_OUT link
       const url = copyToHttpsOutAndGetUrl(convertedFilePath, fileName)
