@@ -8,6 +8,7 @@
 		"fastify": "^4.25.2",
 		"fastify-plugin": "^4.5.1",
 		"fs": "^0.0.1-security",
+		"googleapis": "^166.0.0",
 		"http-errors": "^2.0.0",
 		"https": "^1.0.0",
 		"ip-range-check": "^0.2.0",

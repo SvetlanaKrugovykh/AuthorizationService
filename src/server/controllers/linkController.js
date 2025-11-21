@@ -2,6 +2,7 @@
 const path = require('path')
 const fs = require('fs')
 const doConvertXlsx = require('../services/xlsxService')
+const { uploadFileToDrive } = require('../services/googleDiskService')
 require('dotenv').config()
 
 
@@ -45,13 +46,12 @@ exports.linkThroughXlsx = async (req, reply) => {
     }
 
     if (variant === '2') {
-      // Upload to Google Drive and return real link
-      const { uploadFileToDrive } = require('../services/googleDiskService')
       try {
         const driveUrl = await uploadFileToDrive(convertedFilePath, fileName)
         reply.send({ url: driveUrl })
       } catch (err) {
-        reply.code(500).send({ error: 'Google Drive upload failed: ' + err.message })
+        console.error('Google Drive upload error:', err)
+        reply.code(500).send({ error: 'Google Drive upload failed: ' + (err.message || err) })
       }
     } else if (variant === '1' && forceLink) {
       // Return HTTPS_OUT link

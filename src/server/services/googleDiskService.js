@@ -2,8 +2,9 @@
 const { google } = require('googleapis')
 const fs = require('fs')
 const path = require('path')
+
+const { PassThrough } = require('stream')
 require('dotenv').config()
-const { getSecretKey } = require('../guards/getCredentials')
 
 const CREDENTIALS_PATH = process.env.GOOGLE_APPLICATION_CREDENTIALS
 const FOLDER_ID = process.env.GOOGLE_DRIVE_FOLDER_ID
@@ -26,6 +27,11 @@ function getDriveService() {
  * @returns {Promise<string>} - Public URL to the file
  */
 async function uploadFileToDrive(filePath, fileName) {
+
+  const buffer = fs.readFileSync(filePath)
+  const stream = new PassThrough()
+  stream.end(buffer)
+
   const drive = getDriveService()
   const fileMetadata = {
     name: fileName,
@@ -33,8 +39,9 @@ async function uploadFileToDrive(filePath, fileName) {
   }
   const media = {
     mimeType: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
-    body: fs.createReadStream(filePath),
+    body: stream,
   }
+
   const res = await drive.files.create({
     resource: fileMetadata,
     media,
