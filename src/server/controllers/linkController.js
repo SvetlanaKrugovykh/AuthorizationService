@@ -50,8 +50,8 @@ exports.linkThroughXlsx = async (req, reply) => {
         const driveUrl = await uploadFileToDrive(convertedFilePath, fileName)
         reply.send({ url: driveUrl })
       } catch (err) {
-        console.error('Google Drive upload error:', err)
-        reply.code(500).send({ error: 'Google Drive upload failed: ' + (err.message || err) })
+        console.error('Google Drive upload failed:', err.message)
+        reply.code(500).send({ error: err.message })
       }
     } else if (variant === '1' && forceLink) {
       // Return HTTPS_OUT link
