@@ -32,8 +32,17 @@ exports.linkThroughXlsx = async (req, reply) => {
     if (variant === '1') {
       // Option 1: return file
       const convertedFilePath = await doConvertXlsx.doConvertXlsx(filePath)
-      reply.header('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet')
-      reply.send(fs.createReadStream(convertedFilePath))
+      reply.type('application/vnd.openxmlformats-officedocument.spreadsheetml.sheet')
+      reply.header('Content-Disposition', 'attachment; filename="' + path.basename(convertedFilePath) + '"')
+      const stats = fs.statSync(convertedFilePath)
+      if (stats.size === 0) {
+        reply.code(500).send({ error: 'Converted file is empty' })
+        return
+      }
+      const fileBuffer = fs.readFileSync(convertedFilePath)
+      reply.type('application/vnd.openxmlformats-officedocument.spreadsheetml.sheet')
+      reply.header('Content-Disposition', 'attachment; filename="' + path.basename(convertedFilePath) + '"')
+      reply.send(fileBuffer)
     } else if (variant === '2') {
       // Option 2: return Google Drive link (stub for now)
       const driveUrl = 'https://drive.google.com/link/' + data.filename
