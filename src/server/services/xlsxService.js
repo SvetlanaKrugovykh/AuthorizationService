@@ -1,37 +1,33 @@
 const fs = require('fs')
 const path = require('path')
-const { execSync } = require('child_process')
 require('dotenv').config()
 
 module.exports.doConvertXlsx = async function (inputFilePath) {
-  // Determine output directory and file name
-  let outDir = process.env.XLSX_OUT || path.join(__dirname, '../../temp')
-  // If XLSX_OUT is set, ensure absolute path is created
-  if (process.env.XLSX_OUT) {
-    outDir = path.isAbsolute(process.env.XLSX_OUT) ? process.env.XLSX_OUT : path.resolve(process.env.XLSX_OUT)
-  }
+  const originalFile = inputFilePath
+  const outDir = process.env.XLSX_OUT || path.join(__dirname, '../../temp')
   if (!fs.existsSync(outDir)) fs.mkdirSync(outDir, { recursive: true })
-  const outputFileName = path.basename(inputFilePath)
+  const outputFileName = path.basename(originalFile)
   const outputFilePath = path.join(outDir, outputFileName)
 
-  // Copy input file to output directory
-  fs.copyFileSync(inputFilePath, outputFilePath)
+  fs.copyFileSync(originalFile, outputFilePath)
 
-  // Example: tempDir for further processing (stub)
-  const tempDir = process.env.TEMP_CATALOG || path.join(__dirname, '../../temp/xlsx')
-  if (!fs.existsSync(tempDir)) fs.mkdirSync(tempDir, { recursive: true })
+  const tempDir = path.join(outDir, 'temp_final')
+  fs.mkdirSync(tempDir, { recursive: true })
 
-  // Example: sharedStrings.xml processing (stub)
+  // Extract XLSX archive (platform-independent)
+  const AdmZip = require('adm-zip')
+  const zip = new AdmZip(outputFilePath)
+  zip.extractAllTo(tempDir, true)
+
+  // Remove HYPERLINK formulas
   const sharedStringsPath = path.join(tempDir, 'xl', 'sharedStrings.xml')
-  if (fs.existsSync(sharedStringsPath)) {
-    let content = fs.readFileSync(sharedStringsPath, 'utf8')
-    content = content.replace(/=HYPERLINK\("([^"]+)","([^"]+)"\)/g, '$2')
-    fs.writeFileSync(sharedStringsPath, content, 'utf8')
-  }
+  let content = fs.readFileSync(sharedStringsPath, 'utf8')
+  content = content.replace(/=HYPERLINK\("([^"]+)","([^"]+)"\)/g, '$2')
+  fs.writeFileSync(sharedStringsPath, content, 'utf8')
 
-  // Example: relsDir and relsContent (stub)
+  // Create relationships for hyperlinks
   const relsDir = path.join(tempDir, 'xl', 'worksheets', '_rels')
-  if (!fs.existsSync(relsDir)) fs.mkdirSync(relsDir, { recursive: true })
+  fs.mkdirSync(relsDir, { recursive: true })
   const relsContent = `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
 <Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">
 <Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/hyperlink" Target="https://drive.google.com/file/d/1lVqn2_zexcaSruT3c4VC7ItrTS0JXuXz/view" TargetMode="External"/>
@@ -39,31 +35,42 @@ module.exports.doConvertXlsx = async function (inputFilePath) {
 </Relationships>`
   fs.writeFileSync(path.join(relsDir, 'sheet1.xml.rels'), relsContent, 'utf8')
 
-  // Example: worksheet.xml processing (stub)
+  // Add hyperlinks to worksheet
   const worksheetPath = path.join(tempDir, 'xl', 'worksheets', 'sheet1.xml')
-  if (fs.existsSync(worksheetPath)) {
-    let worksheet = fs.readFileSync(worksheetPath, 'utf8')
-    if (!worksheet.includes('xmlns:r=')) {
-      worksheet = worksheet.replace('<worksheet', '<worksheet xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"')
-    }
-    const hyperlinks = `<hyperlinks>\n<hyperlink ref="K14" r:id="rId1"/>\n<hyperlink ref="L14" r:id="rId2"/>\n</hyperlinks>`
-    worksheet = worksheet.replace('</worksheet>', hyperlinks + '</worksheet>')
-    worksheet = worksheet.replace(
-      /(<row[^>]*)\s+ht="[^"]*"([^>]*customHeight="true"[^>]*>)/g,
-      (match, before, after) => {
-        return before + ' ht="15"' + after.replace(/\s+customHeight="true"/g, '')
-      }
-    )
-    fs.writeFileSync(worksheetPath, worksheet, 'utf8')
+  let worksheet = fs.readFileSync(worksheetPath, 'utf8')
+  if (!worksheet.includes('xmlns:r=')) {
+    worksheet = worksheet.replace('<worksheet', '<worksheet xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"')
   }
+  const hyperlinks = `<hyperlinks>\n<hyperlink ref="K14" r:id="rId1"/>\n<hyperlink ref="L14" r:id="rId2"/>\n</hyperlinks>`
+  worksheet = worksheet.replace('</worksheet>', hyperlinks + '</worksheet>')
+  worksheet = worksheet.replace(
+    /(<row[^>]*)\s+ht="[^"]*"([^>]*customHeight="true"[^>]*>)/g,
+    (match, before, after) => {
+      return before + ' ht="15"' + after.replace(/\s+customHeight="true"/g, '')
+    }
+  )
+  fs.writeFileSync(worksheetPath, worksheet, 'utf8')
 
-  // Remove tempDir if needed
-  // fs.rmSync(tempDir, { recursive: true, force: true })
+  // Recreate XLSX archive (platform-independent)
+  fs.unlinkSync(outputFilePath)
 
-  // Log output
-  console.log('Done!')
-  console.log('File:', outputFilePath)
+  const newZip = new AdmZip()
+  function addDirToZip(dir, zipInstance, basePath = '') {
+    const items = fs.readdirSync(dir)
+    for (const item of items) {
+      const fullPath = path.join(dir, item)
+      const relPath = path.join(basePath, item)
+      if (fs.statSync(fullPath).isDirectory()) {
+        addDirToZip(fullPath, zipInstance, relPath)
+      } else {
+        zipInstance.addLocalFile(fullPath, path.dirname(relPath))
+      }
+    }
+  }
+  addDirToZip(tempDir, newZip)
+  newZip.writeZip(outputFilePath)
 
-  // Return output file path
+  fs.rmSync(tempDir, { recursive: true, force: true })
+
   return outputFilePath
 }
