@@ -4,11 +4,18 @@ const authService = require('../services/authService')
 require('dotenv').config()
 //const authService = require('../services/authService')
 
-const allowedIPAddresses = process.env.API_ALLOWED_IPS.split(',')
+const allowedIPAddresses = [
+  ...(process.env.API_ALLOWED_IPS ? process.env.API_ALLOWED_IPS.split(',').map(ip => ip.trim()) : []),
+  ...(process.env.VIP_API_ALLOWED_IPS ? process.env.VIP_API_ALLOWED_IPS.split(',').map(ip => ip.trim()) : [])
+]
 const allowedSubnets = process.env.API_ALLOWED_SUBNETS.split(',')
 
 const restrictIPMiddleware = (req, reply, done) => {
-  const clientIP = req.ip
+  let clientIP = req.ip
+  // Normalize IPv6-mapped IPv4 addresses
+  if (clientIP.startsWith('::ffff:')) {
+    clientIP = clientIP.replace('::ffff:', '')
+  }
   if (!allowedIPAddresses.includes(clientIP) && !ipRangeCheck(clientIP, allowedSubnets)) {
     console.log(`${new Date()}: Forbidden IP: ${clientIP}`)
     reply.code(403).send('Forbidden')
