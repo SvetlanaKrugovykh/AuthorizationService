@@ -5,23 +5,30 @@ const doConvertXlsx = require('../services/xlsxService')
 require('dotenv').config()
 
 
+function copyToHttpsOutAndGetUrl(filePath, fileName) {
+  const outDir = process.env.HTTPS_OUT || path.join(__dirname, '../temp')
+  if (!fs.existsSync(outDir)) fs.mkdirSync(outDir, { recursive: true })
+  const destPath = path.join(outDir, fileName)
+  fs.copyFileSync(filePath, destPath)
+  const baseUrl = process.env.HTTPS_OUT_URL || 'https://localhost/files/'
+  return baseUrl + encodeURIComponent(fileName)
+}
+
 exports.linkThroughXlsx = async (req, reply) => {
   try {
     const data = await req.file()
-    const variant = req.body?.variant || '1'
+    const variant = req?.headers?.variant || '1'
+    const forceLink = req?.headers?.['force-link'] === 'true'
     if (!data) {
       reply.code(400).send({ error: 'No file uploaded' })
       return
     }
-    // Save file to input folder
     let tempDir = process.env.XLSX_IN || path.join(__dirname, '../temp')
-    // If XLSX_IN is set, ensure absolute path is created
     if (process.env.XLSX_IN) {
       tempDir = path.isAbsolute(process.env.XLSX_IN) ? process.env.XLSX_IN : path.resolve(process.env.XLSX_IN)
     }
     if (!fs.existsSync(tempDir)) fs.mkdirSync(tempDir, { recursive: true })
     const filePath = path.join(tempDir, data.filename)
-    // Write file using pipe for correct stream handling
     await new Promise((resolve, reject) => {
       const writeStream = fs.createWriteStream(filePath)
       data.file.pipe(writeStream)
@@ -29,24 +36,27 @@ exports.linkThroughXlsx = async (req, reply) => {
       writeStream.on('error', reject)
     })
 
-    if (variant === '1') {
-      // Option 1: return file
-      const convertedFilePath = await doConvertXlsx.doConvertXlsx(filePath)
-      reply.type('application/vnd.openxmlformats-officedocument.spreadsheetml.sheet')
-      reply.header('Content-Disposition', 'attachment; filename="' + path.basename(convertedFilePath) + '"')
-      const stats = fs.statSync(convertedFilePath)
-      if (stats.size === 0) {
-        reply.code(500).send({ error: 'Converted file is empty' })
-        return
-      }
+    const convertedFilePath = await doConvertXlsx.doConvertXlsx(filePath)
+    const fileName = path.basename(convertedFilePath)
+    const stats = fs.statSync(convertedFilePath)
+    if (stats.size === 0) {
+      reply.code(500).send({ error: 'Converted file is empty' })
+      return
+    }
+
+    if (variant === '2') {
+      // Return Google Drive link (stub)
+      const driveUrl = 'https://drive.google.com/link/' + encodeURIComponent(fileName)
+      reply.send({ url: driveUrl })
+    } else if (variant === '1' && forceLink) {
+      // Return HTTPS_OUT link
+      const url = copyToHttpsOutAndGetUrl(convertedFilePath, fileName)
+      reply.send({ url })
+    } else if (variant === '1') {
       const fileBuffer = fs.readFileSync(convertedFilePath)
       reply.type('application/vnd.openxmlformats-officedocument.spreadsheetml.sheet')
-      reply.header('Content-Disposition', 'attachment; filename="' + path.basename(convertedFilePath) + '"')
+      reply.header('Content-Disposition', 'attachment; filename="' + fileName + '"')
       reply.send(fileBuffer)
-    } else if (variant === '2') {
-      // Option 2: return Google Drive link (stub for now)
-      const driveUrl = 'https://drive.google.com/link/' + data.filename
-      reply.send({ url: driveUrl })
     } else {
       reply.code(400).send({ error: 'Unknown variant' })
     }
