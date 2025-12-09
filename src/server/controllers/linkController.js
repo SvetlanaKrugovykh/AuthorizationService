@@ -58,10 +58,9 @@ exports.linkThroughXlsx = async (req, reply) => {
       const url = copyToHttpsOutAndGetUrl(convertedFilePath, fileName)
       reply.send({ url })
     } else if (variant === '1') {
-      const fileBuffer = fs.readFileSync(convertedFilePath)
       reply.type('application/vnd.openxmlformats-officedocument.spreadsheetml.sheet')
       reply.header('Content-Disposition', 'attachment; filename="' + fileName + '"')
-      reply.send(fileBuffer)
+      reply.send(fs.createReadStream(convertedFilePath))
     } else {
       reply.code(400).send({ error: 'Unknown variant' })
     }
