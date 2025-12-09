@@ -61,9 +61,10 @@ module.exports.doConvertXlsx = async function (inputFilePath) {
       while ((siMatch = siPattern.exec(content)) !== null) {
         if (siCount === parseInt(stringIndex)) {
           if (siMatch[0].includes(marker)) {
-            // Replace this cell with HYPERLINK formula
+            // Replace this cell with HYPERLINK formula - REMOVE t="s" attribute
             const hyperlinkFormula = `=HYPERLINK("${url}","${marker}")`
-            const newCell = `<c r="${cellRef}"${cellAttrs}><f>${hyperlinkFormula}</f></c>`
+            const cleanAttrs = cellAttrs.replace(/\s*t="s"/, '') // Remove shared string type
+            const newCell = `<c r="${cellRef}"${cleanAttrs}><f>${hyperlinkFormula}</f></c>`
             worksheet = worksheet.replace(cellMatch[0], newCell)
           }
           break
