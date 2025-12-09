@@ -114,7 +114,7 @@ ${newRelsXml}</Relationships>`
           // Found the matching <si> block
           if (siMatch[0].includes(marker)) {
             // This cell contains our marker!
-            hyperlinkElements += `    <hyperlink ref="${cellRef}" r:id="${relId}"/>\n`
+            hyperlinkElements += `  <hyperlink ref="${cellRef}" r:id="${relId}"/>\n`
           }
           break
         }
@@ -129,7 +129,7 @@ ${newRelsXml}</Relationships>`
     worksheet = worksheet.replace(/<hyperlinks>[\s\S]*?<\/hyperlinks>/g, '')
     // Insert hyperlinks in correct XML position - after legacyDrawingHF, before worksheet closing tag  
     if (worksheet.includes('<legacyDrawingHF')) {
-      worksheet = worksheet.replace(/(<legacyDrawingHF[^>]*\/>)/, `$1\n  ${hyperlinks}`)
+      worksheet = worksheet.replace(/(<legacyDrawingHF[^>]*\/>)/, `$1\n${hyperlinks}`)
     } else if (worksheet.includes('</sheetData>')) {
       worksheet = worksheet.replace('</sheetData>', `</sheetData>\n${hyperlinks}`)
     } else {
