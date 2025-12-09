@@ -83,49 +83,69 @@ ${newRelsXml}</Relationships>`
   // Parse worksheet to find cells with markers and build hyperlinks
   let hyperlinkElements = ''
   
-  // First, find indices of markers in sharedStrings
-  const sharedStringsContent = fs.readFileSync(sharedStringsPath, 'utf8')
-  const markerIndices = {}
-  
-  for (const [marker, url] of Object.entries(hyperlinksMap)) {
-    // Find marker in sharedStrings: <t>marker</t> or <t>marker</t> with variations
-    const markerRegex = new RegExp(`<t[^>]*>${marker}</t>`, 'g')
-    let match
-    let index = 0
-    let count = 0
-    
-    // Count which index this marker appears at
-    const tempContent = sharedStringsContent
-    const allMatches = tempContent.match(/<si[^>]*>[\s\S]*?<\/si>/g) || []
-    for (let i = 0; i < allMatches.length; i++) {
-      if (allMatches[i].includes(marker)) {
-        if (!markerIndices[marker]) {
-          markerIndices[marker] = i
-        }
-      }
-    }
-  }
-
-  // Now find cells in worksheet that reference these indices
+  // For each marker, find cells that contain it
   for (const { marker, relId } of hyperlinksToAdd) {
-    const markerIndex = markerIndices[marker]
-    if (markerIndex !== undefined) {
-      // Find cells with v={markerIndex}
-      const cellRegex = new RegExp(`<c r="([A-Z]+\\d+)"[^>]*t="s"[^>]*>\\s*<v>${markerIndex}</v>\\s*</c>`, 'g')
-      let match
-      while ((match = cellRegex.exec(worksheet)) !== null) {
-        hyperlinkElements += `<hyperlink ref="${match[1]}" r:id="${relId}"/>\n`
+    // Look for cells containing the marker text value
+    // The marker might be wrapped as: <c r="K14" ... t="s"><v>123</v></c> where shared string 123 contains the marker
+    // But we need to find which cells actually display the marker
+    // Simple approach: find all cells and check their content
+    
+    // Match pattern: <c r="CELLREF" ... >...<v>INDEX</v>...</c>
+    // Then check if that index in sharedStrings contains our marker
+    const cellPattern = /<c r="([A-Z]+\d+)"[^>]*>[\s\S]*?<v>(\d+)<\/v>[\s\S]*?<\/c>/g
+    let cellMatch
+    
+    while ((cellMatch = cellPattern.exec(worksheet)) !== null) {
+      const cellRef = cellMatch[1]
+      const stringIndex = cellMatch[2]
+      
+      // Check if this index in sharedStrings contains our marker
+      // Find the stringIndex-th <si> block
+      const siPattern = /<si[^>]*>[\s\S]*?<\/si>/g
+      let siMatch
+      let siCount = 0
+      
+      while ((siMatch = siPattern.exec(sharedStringsContent)) !== null) {
+        if (siCount === parseInt(stringIndex)) {
+          // Found the matching <si> block
+          if (siMatch[0].includes(marker)) {
+            // This cell contains our marker!
+            hyperlinkElements += `<hyperlink ref="${cellRef}" r:id="${relId}"/>\n`
+          }
+          break
+        }
+        siCount++
       }
     }
   }
 
   if (hyperlinkElements) {
     const hyperlinks = `<hyperlinks>\n${hyperlinkElements}</hyperlinks>`
-    worksheet = worksheet.replace('</worksheet>', hyperlinks + '</worksheet>')
+    // Insert hyperlinks before closing </worksheet> tag
+    // Make sure it's properly placed in XML structure
+    worksheet = worksheet.replace(/(<\/worksheet>)$/m, hyperlinks + '\n$1')
   }
 
   fs.writeFileSync(worksheetPath, worksheet, 'utf8')
 
+  // Update files inside existing archive (preserves original structure and MS Office compatibility)
+  zip.updateFile('xl/sharedStrings.xml', Buffer.from(content, 'utf8'))
+  zip.updateFile('xl/worksheets/sheet1.xml', Buffer.from(worksheet, 'utf8'))
+  
+  // Add or update relationships file
+  const relsFileInZip = 'xl/worksheets/_rels/sheet1.xml.rels'
+  if (zip.getEntry(relsFileInZip)) {
+    zip.updateFile(relsFileInZip, Buffer.from(relsContent, 'utf8'))
+  } else {
+    zip.addFile(relsFileInZip, Buffer.from(relsContent, 'utf8'))
+  }
+
+  zip.writeZip(outputFilePath)
+
+  fs.rmSync(tempDir, { recursive: true, force: true })
+
+  return outputFilePath
+}
   // Update files inside existing archive (preserves original structure and MS Office compatibility)
   zip.updateFile('xl/sharedStrings.xml', Buffer.from(content, 'utf8'))
   zip.updateFile('xl/worksheets/sheet1.xml', Buffer.from(worksheet, 'utf8'))
