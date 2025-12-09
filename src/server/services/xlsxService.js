@@ -35,6 +35,12 @@ module.exports.doConvertXlsx = async function (inputFilePath) {
   content = content.replace(/=HYPERLINK\("([^"]+)","([^"]+)"\)/g, '$2')
   fs.writeFileSync(sharedStringsPath, content, 'utf8')
 
+  // Create hyperlinks list for processing
+  const hyperlinksToAdd = []
+  for (const [marker, url] of Object.entries(hyperlinksMap)) {
+    hyperlinksToAdd.push({ marker, url })
+  }
+
   // Find cells with hyperlink markers and build hyperlinks element
   const worksheetPath = path.join(tempDir, 'xl', 'worksheets', 'sheet1.xml')
   let worksheet = fs.readFileSync(worksheetPath, 'utf8')
@@ -72,7 +78,7 @@ module.exports.doConvertXlsx = async function (inputFilePath) {
           // Found the matching <si> block
           if (siMatch[0].includes(marker)) {
             // This cell contains our marker!
-            hyperlinkElements += `  <hyperlink ref="${cellRef}" r:id="${relId}"/>\n`
+            hyperlinkElements += `  <hyperlink ref="${cellRef}" location="${hyperlinksMap[marker]}"/>\n`
           }
           break
         }
@@ -81,15 +87,9 @@ module.exports.doConvertXlsx = async function (inputFilePath) {
     }
   }
 
-  // Create hyperlinks with correct URLs for each cell
+  // Add hyperlinks directly with location URLs
   if (hyperlinkElements) {
-    let correctedHyperlinks = hyperlinkElements
-    // Replace each r:id with correct location URL
-    for (const { marker, relId } of hyperlinksToAdd) {
-      const url = hyperlinksMap[marker]
-      correctedHyperlinks = correctedHyperlinks.replace(`r:id="${relId}"`, `location="${url}"`)
-    }
-    const hyperlinks = `<hyperlinks>\n${correctedHyperlinks}</hyperlinks>`
+    const hyperlinks = `<hyperlinks>\n${hyperlinkElements}</hyperlinks>`
     worksheet = worksheet.replace(/(<\/worksheet>)$/m, hyperlinks + '\n$1')
   }
 
