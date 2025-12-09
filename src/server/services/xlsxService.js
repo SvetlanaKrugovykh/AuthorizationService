@@ -60,7 +60,7 @@ module.exports.doConvertXlsx = async function (inputFilePath) {
 
   for (const [marker, url] of Object.entries(hyperlinksMap)) {
     const relId = `rId${nextId}`
-    newRelsXml += `<Relationship Id="${relId}" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/hyperlink" Target="${url}" TargetMode="External"/>\n`
+    newRelsXml += `        <Relationship Id="${relId}" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/hyperlink" Target="${url}" TargetMode="External"/>\n`
     hyperlinksToAdd.push({ marker, relId, url })
     nextId++
   }
