@@ -81,11 +81,15 @@ module.exports.doConvertXlsx = async function (inputFilePath) {
     }
   }
 
-  // Create simple hyperlinks without relationships - direct URLs
+  // Create hyperlinks with correct URLs for each cell
   if (hyperlinkElements) {
-    // Try MS Office compatible hyperlinks without relationships
-    const simpleHyperlinks = hyperlinkElements.replace(/r:id="[^"]*"/g, 'location="' + Object.values(hyperlinksMap)[0] + '"')
-    const hyperlinks = `<hyperlinks>\n${simpleHyperlinks}</hyperlinks>`
+    let correctedHyperlinks = hyperlinkElements
+    // Replace each r:id with correct location URL
+    for (const { marker, relId } of hyperlinksToAdd) {
+      const url = hyperlinksMap[marker]
+      correctedHyperlinks = correctedHyperlinks.replace(`r:id="${relId}"`, `location="${url}"`)
+    }
+    const hyperlinks = `<hyperlinks>\n${correctedHyperlinks}</hyperlinks>`
     worksheet = worksheet.replace(/(<\/worksheet>)$/m, hyperlinks + '\n$1')
   }
 
