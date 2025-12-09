@@ -31,11 +31,54 @@ module.exports.doConvertXlsx = async function (inputFilePath) {
     hyperlinksMap[match[2]] = match[1]  // marker -> URL
   }
 
-  // MINIMAL TEST: Only replace HYPERLINK formulas, NO hyperlinks added
+  // Replace HYPERLINK formulas with just the display text
   content = content.replace(/=HYPERLINK\("([^"]+)","([^"]+)"\)/g, '$2')
   fs.writeFileSync(sharedStringsPath, content, 'utf8')
 
-  // Skip all hyperlinks logic for now
+  // STEP 1: Add only relationships, no worksheet hyperlinks yet
+  const relsDir = path.join(tempDir, 'xl', 'worksheets', '_rels')
+  fs.mkdirSync(relsDir, { recursive: true })
+  const relsPath = path.join(relsDir, 'sheet1.xml.rels')
+  let existingRels = ''
+  let maxId = 0
+
+  if (fs.existsSync(relsPath)) {
+    existingRels = fs.readFileSync(relsPath, 'utf8')
+    const idMatches = existingRels.match(/Id="rId(\d+)"/g)
+    if (idMatches) {
+      idMatches.forEach(match => {
+        const num = parseInt(match.replace(/\D/g, ''))
+        if (num > maxId) maxId = num
+      })
+    }
+  }
+
+  let newRelsXml = ''
+  let nextId = maxId + 1
+  for (const [marker, url] of Object.entries(hyperlinksMap)) {
+    newRelsXml += `        <Relationship Id="rId${nextId}" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/hyperlink" Target="${url}" TargetMode="External"/>\n`
+    nextId++
+  }
+
+  if (newRelsXml) {
+    let relsContent
+    if (existingRels) {
+      relsContent = existingRels.replace('</Relationships>', newRelsXml + '</Relationships>')
+    } else {
+      relsContent = `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">
+${newRelsXml}</Relationships>`
+    }
+    fs.writeFileSync(relsPath, relsContent, 'utf8')
+
+    // Add relationships to ZIP
+    const relsFileInZip = 'xl/worksheets/_rels/sheet1.xml.rels'
+    if (zip.getEntry(relsFileInZip)) {
+      zip.updateFile(relsFileInZip, Buffer.from(relsContent, 'utf8'))
+    } else {
+      zip.addFile(relsFileInZip, Buffer.from(relsContent, 'utf8'))
+    }
+  }
 
   zip.writeZip(outputFilePath)
 
