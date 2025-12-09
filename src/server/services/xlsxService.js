@@ -35,15 +35,46 @@ module.exports.doConvertXlsx = async function (inputFilePath) {
   content = content.replace(/=HYPERLINK\("([^"]+)","([^"]+)"\)/g, '$2')
   fs.writeFileSync(sharedStringsPath, content, 'utf8')
 
-  // SIMPLE APPROACH: Create inline HYPERLINK formulas in sharedStrings
-  // Don't touch relationships at all - just put back working HYPERLINK formulas
-  
-  for (const [marker, url] of Object.entries(hyperlinksMap)) {
-    const hyperlinkFormula = `=HYPERLINK("${url}","${marker}")`
-    content = content.replace(new RegExp(marker.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'g'), hyperlinkFormula)
-  }
-  
+  // Keep sharedStrings as is - just remove HYPERLINK formulas  
+  content = content.replace(/=HYPERLINK\("([^"]+)","([^"]+)"\)/g, '$2')
   fs.writeFileSync(sharedStringsPath, content, 'utf8')
+
+  // Modify worksheet cells to contain HYPERLINK formulas directly
+  const worksheetPath = path.join(tempDir, 'xl', 'worksheets', 'sheet1.xml')
+  let worksheet = fs.readFileSync(worksheetPath, 'utf8')
+
+  for (const [marker, url] of Object.entries(hyperlinksMap)) {
+    // Find cells that reference sharedStrings containing the marker
+    const cellPattern = /<c r="([A-Z]+\d+)"([^>]*) t="s"><v>(\d+)<\/v><\/c>/g
+    let cellMatch
+    
+    while ((cellMatch = cellPattern.exec(worksheet)) !== null) {
+      const cellRef = cellMatch[1]
+      const cellAttrs = cellMatch[2]
+      const stringIndex = cellMatch[3]
+      
+      // Check if this sharedString index contains our marker
+      const siPattern = /<si[^>]*>[\s\S]*?<\/si>/g
+      let siMatch
+      let siCount = 0
+      
+      while ((siMatch = siPattern.exec(content)) !== null) {
+        if (siCount === parseInt(stringIndex)) {
+          if (siMatch[0].includes(marker)) {
+            // Replace this cell with HYPERLINK formula
+            const hyperlinkFormula = `=HYPERLINK("${url}","${marker}")`
+            const newCell = `<c r="${cellRef}"${cellAttrs}><f>${hyperlinkFormula}</f></c>`
+            worksheet = worksheet.replace(cellMatch[0], newCell)
+          }
+          break
+        }
+        siCount++
+      }
+    }
+  }
+
+  fs.writeFileSync(worksheetPath, worksheet, 'utf8')
+  zip.updateFile('xl/worksheets/sheet1.xml', Buffer.from(worksheet, 'utf8'))
 
   zip.writeZip(outputFilePath)
 
