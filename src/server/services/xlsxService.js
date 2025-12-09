@@ -124,7 +124,7 @@ ${newRelsXml}</Relationships>`
   }
 
   if (hyperlinkElements) {
-    const hyperlinks = `<hyperlinks>\n${hyperlinkElements}  </hyperlinks>`
+    const hyperlinks = `  <hyperlinks>\n${hyperlinkElements}  </hyperlinks>`
     // Remove any existing hyperlinks first to avoid duplicates
     worksheet = worksheet.replace(/<hyperlinks>[\s\S]*?<\/hyperlinks>/g, '')
     // Insert hyperlinks in correct XML position - after legacyDrawingHF, before worksheet closing tag  
