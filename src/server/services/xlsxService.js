@@ -113,7 +113,7 @@ ${newRelsXml}</Relationships>`
           // Found the matching <si> block
           if (siMatch[0].includes(marker)) {
             // This cell contains our marker!
-            hyperlinkElements += `  <hyperlink ref="${cellRef}" r:id="${relId}"/>\n`
+            hyperlinkElements += `          <hyperlink ref="${cellRef}" r:id="${relId}"/>\n`
           }
           break
         }
@@ -123,7 +123,7 @@ ${newRelsXml}</Relationships>`
   }
 
   if (hyperlinkElements) {
-    const hyperlinks = `<hyperlinks>\n${hyperlinkElements}</hyperlinks>`
+    const hyperlinks = `        <hyperlinks>\n${hyperlinkElements}        </hyperlinks>`
     worksheet = worksheet.replace(/(<\/worksheet>)$/m, hyperlinks + '\n$1')
   }
 
