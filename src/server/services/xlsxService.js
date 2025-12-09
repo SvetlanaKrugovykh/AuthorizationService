@@ -86,7 +86,7 @@ ${newRelsXml}</Relationships>`
 
   // Find cells with hyperlink markers and build hyperlinks element
   let hyperlinkElements = ''
-  let nextId = maxId + 1
+  nextId = maxId + 1 // Reset nextId for hyperlinks
   
   for (const [marker, url] of Object.entries(hyperlinksMap)) {
     const relId = `rId${nextId}`
