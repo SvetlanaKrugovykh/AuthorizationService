@@ -5,7 +5,6 @@
 		"axios": "^1.7.2",
 		"crypto": "^1.0.1",
 		"dotenv": "^16.4.5",
-		"exceljs": "^4.4.0",
 		"fastify": "^4.25.2",
 		"fastify-plugin": "^4.5.1",
 		"fs": "^0.0.1-security",
@@ -14,6 +13,7 @@
 		"https": "^1.0.0",
 		"ip-range-check": "^0.2.0",
 		"jsonwebtoken": "^9.0.2",
-		"path": "^0.12.7"
+		"path": "^0.12.7",
+		"xlsx": "^0.18.5"
 	}
 }
