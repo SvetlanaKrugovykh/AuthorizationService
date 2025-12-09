@@ -79,9 +79,7 @@ ${newRelsXml}</Relationships>`
   // Find cells with hyperlink markers and build hyperlinks element
   const worksheetPath = path.join(tempDir, 'xl', 'worksheets', 'sheet1.xml')
   let worksheet = fs.readFileSync(worksheetPath, 'utf8')
-  if (!worksheet.includes('xmlns:r=')) {
-    worksheet = worksheet.replace('<worksheet', '<worksheet xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"')
-  }
+  // xmlns:r already exists in worksheet, no need to add
 
   // Parse worksheet to find cells with markers and build hyperlinks
   let hyperlinkElements = ''
