@@ -22,12 +22,16 @@ module.exports.doConvertXlsx = async function (inputFilePath) {
   // Remove HYPERLINK formulas and extract links
   const sharedStringsPath = path.join(tempDir, 'xl', 'sharedStrings.xml')
   let content = fs.readFileSync(sharedStringsPath, 'utf8')
-  const hyperlinksMap = {
-    '[Фото]': 'https://drive.google.com/file/d/1lVqn2_zexcaSruT3c4VC7ItrTS0JXuXz/view',
-    '[Мапа]': 'https://www.google.com/maps/place/50%C2%B023\'30.5%22N+30%C2%B022\'39.8%22E/@50.3917937,30.3766247,18z'
+  
+  // Extract URLs from HYPERLINK formulas
+  const hyperlinksMap = {}
+  const hyperlinkRegex = /=HYPERLINK\("([^"]+)","([^"]+)"\)/g
+  let match
+  while ((match = hyperlinkRegex.exec(content)) !== null) {
+    hyperlinksMap[match[2]] = match[1]  // marker -> URL
   }
 
-  // Replace HYPERLINK formulas
+  // Replace HYPERLINK formulas with just the display text
   content = content.replace(/=HYPERLINK\("([^"]+)","([^"]+)"\)/g, '$2')
   fs.writeFileSync(sharedStringsPath, content, 'utf8')
 
@@ -105,7 +109,7 @@ ${newRelsXml}</Relationships>`
       let siMatch
       let siCount = 0
       
-      while ((siMatch = siPattern.exec(sharedStringsContent)) !== null) {
+      while ((siMatch = siPattern.exec(content)) !== null) {
         if (siCount === parseInt(stringIndex)) {
           // Found the matching <si> block
           if (siMatch[0].includes(marker)) {
@@ -128,24 +132,6 @@ ${newRelsXml}</Relationships>`
 
   fs.writeFileSync(worksheetPath, worksheet, 'utf8')
 
-  // Update files inside existing archive (preserves original structure and MS Office compatibility)
-  zip.updateFile('xl/sharedStrings.xml', Buffer.from(content, 'utf8'))
-  zip.updateFile('xl/worksheets/sheet1.xml', Buffer.from(worksheet, 'utf8'))
-  
-  // Add or update relationships file
-  const relsFileInZip = 'xl/worksheets/_rels/sheet1.xml.rels'
-  if (zip.getEntry(relsFileInZip)) {
-    zip.updateFile(relsFileInZip, Buffer.from(relsContent, 'utf8'))
-  } else {
-    zip.addFile(relsFileInZip, Buffer.from(relsContent, 'utf8'))
-  }
-
-  zip.writeZip(outputFilePath)
-
-  fs.rmSync(tempDir, { recursive: true, force: true })
-
-  return outputFilePath
-}
   // Update files inside existing archive (preserves original structure and MS Office compatibility)
   zip.updateFile('xl/sharedStrings.xml', Buffer.from(content, 'utf8'))
   zip.updateFile('xl/worksheets/sheet1.xml', Buffer.from(worksheet, 'utf8'))
