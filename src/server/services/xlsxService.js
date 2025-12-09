@@ -183,6 +183,47 @@ function convertToHyperlinks(inputFilePath, outputFilePath) {
   // Then add exactly one at the beginning
   worksheet = '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>\n' + cleanWorksheet
 
+  // 8. FIX BROKEN ATTRIBUTES THAT SPAN MULTIPLE LINES (MS Office fix)
+  // Fix broken xmlns attributes that cause MS Office XML errors
+  worksheet = worksheet.replace(/xmlns="http:\/\/schemas\.openxmlformats\.org\/spreadsheetml\/\n2006\/main"/g, 
+    'xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"');
+  worksheet = worksheet.replace(/xmlns:r="http:\/\/schemas\.openxmlformats\.org\/officeDocument\/2006\/rela\n\s*tionships"/g, 
+    'xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"');
+  
+  // Generic fix for any attribute values that span multiple lines
+  worksheet = worksheet.replace(/="([^"]*)\n\s*([^"]*)"/g, '="$1$2"');
+  
+  // Fix broken XML tags that span multiple lines  
+  worksheet = worksheet.replace(/<([^>]*)\n\s*([^>]*)>/g, '<$1 $2>');
+
+  // 9. FORMAT XML PROPERLY FOR MS OFFICE (add proper line breaks)
+  // MS Office is very strict about XML formatting and line counting
+  
+  // Simple but effective approach: add line breaks after every closing tag
+  let formattedWorksheet = '';
+  let i = 0;
+  while (i < worksheet.length) {
+    const char = worksheet[i];
+    formattedWorksheet += char;
+    
+    // Add \r\n after every closing tag >
+    if (char === '>') {
+      // Don't add line break if next chars are already \r\n or \n
+      const nextChar = worksheet[i + 1];
+      const nextTwoChars = worksheet.substring(i + 1, i + 3);
+      
+      if (nextChar !== '\r' && nextChar !== '\n' && nextTwoChars !== '\r\n') {
+        formattedWorksheet += '\r\n';
+      }
+    }
+    i++;
+  }
+  
+  worksheet = formattedWorksheet;
+  
+  // Clean up multiple consecutive line breaks
+  worksheet = worksheet.replace(/\r\n\r\n+/g, '\r\n');
+
   // 7. SAVE EVERYTHING
   fs.writeFileSync(worksheetPath, worksheet, 'utf8')
   zip.updateFile('xl/worksheets/sheet1.xml', Buffer.from(worksheet, 'utf8'))
@@ -200,90 +241,6 @@ function convertToHyperlinks(inputFilePath, outputFilePath) {
   return outputFilePath
 }
 
-// Alternative method using xlsx (SheetJS) library for better MS Office compatibility
-function convertWithSheetJS(inputFilePath, outputFilePath) {
-  const XLSX = require('xlsx')
-  
-  if (!outputFilePath) {
-    const outDir = process.env.XLSX_OUT || path.join(__dirname, '../../temp')
-    if (!fs.existsSync(outDir)) fs.mkdirSync(outDir, { recursive: true })
-    const outputFileName = 'SheetJS_' + path.basename(inputFilePath)
-    outputFilePath = path.join(outDir, outputFileName)
-  }
-
-  try {
-    // Step 1: Extract hyperlinks using our proven method
-    const AdmZip = require('adm-zip')
-    const zip = new AdmZip(inputFilePath)
-    const tempDir = path.join(path.dirname(outputFilePath), 'temp_sheetjs')
-    fs.mkdirSync(tempDir, { recursive: true })
-    zip.extractAllTo(tempDir, true)
-
-    const sharedStringsPath = path.join(tempDir, 'xl', 'sharedStrings.xml')
-    const sharedStrings = fs.readFileSync(sharedStringsPath, 'utf8')
-    
-    const hyperlinkMap = {}
-    const hyperlinkPattern = /=HYPERLINK\("([^"]+)","([^"]+)"\)/g
-    let match
-
-    while ((match = hyperlinkPattern.exec(sharedStrings)) !== null) {
-      const url = match[1]
-      const displayText = match[2]
-      hyperlinkMap[displayText] = url
-    }
-
-    fs.rmSync(tempDir, { recursive: true, force: true })
-
-    if (Object.keys(hyperlinkMap).length === 0) {
-      return null
-    }
-
-    // Step 2: Read with SheetJS and convert
-    const workbook = XLSX.readFile(inputFilePath)
-    const sheetName = workbook.SheetNames[0]
-    const worksheet = workbook.Sheets[sheetName]
-    const range = XLSX.utils.decode_range(worksheet['!ref'])
-
-    let convertedCount = 0
-    
-    for (let row = range.s.r; row <= range.e.r; row++) {
-      for (let col = range.s.c; col <= range.e.c; col++) {
-        const cellAddress = XLSX.utils.encode_cell({ r: row, c: col })
-        const cell = worksheet[cellAddress]
-        
-        if (cell && cell.v && typeof cell.v === 'string') {
-          for (const [marker, url] of Object.entries(hyperlinkMap)) {
-            if (cell.v.includes(marker)) {
-              cell.v = marker
-              cell.t = 's'
-              
-              if (!worksheet['!links']) worksheet['!links'] = {}
-              worksheet['!links'][cellAddress] = {
-                Target: url,
-                Tooltip: marker
-              }
-              
-              convertedCount++
-              break
-            }
-          }
-        }
-      }
-    }
-
-    if (convertedCount === 0) {
-      return null
-    }
-
-    // Write with SheetJS
-    XLSX.writeFile(workbook, outputFilePath)
-    return outputFilePath
-
-  } catch (error) {
-    return null
-  }
-}
-
 module.exports.doConvertXlsx = async function (inputFilePath) {
   const originalFile = inputFilePath
   const outDir = process.env.XLSX_OUT || path.join(__dirname, '../../temp')
@@ -291,15 +248,7 @@ module.exports.doConvertXlsx = async function (inputFilePath) {
   const outputFileName = path.basename(originalFile)
   const outputFilePath = path.join(outDir, outputFileName)
 
-  // Try SheetJS method first (better MS Office compatibility)
-  const sheetJSResult = convertWithSheetJS(originalFile, path.join(outDir, 'SheetJS_' + outputFileName))
-  if (sheetJSResult) {
-    return sheetJSResult
-  }
-
-  // Fallback to custom XML method
   return convertToHyperlinks(originalFile, outputFilePath)
 }
 
 module.exports.convertToHyperlinks = convertToHyperlinks
-module.exports.convertWithSheetJS = convertWithSheetJS
