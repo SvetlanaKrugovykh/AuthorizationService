@@ -1,6 +1,6 @@
 const fs = require('fs')
 const path = require('path')
-const XLSX = require('xlsx')
+const XLSX = require('xlsx-js-style')  // Используем форк с поддержкой стилей!
 
 /**
  * MS Office compatible XLSX hyperlink converter
@@ -77,8 +77,28 @@ function convertToHyperlinks(inputFilePath, outputFilePath) {
   
   console.log('🎯 Found', hyperlinksToCreate.length, 'hyperlinks to create')
   
-  if (hyperlinksToCreate.length === 0) {
-    console.log('❌ No hyperlinks found - copying original file')
+  // Scan for cells with "Продано" text to color green
+  console.log('🎨 Scanning for "Продано" cells to color green...')
+  const cellsToColor = []
+  
+  for (let R = range.s.r; R <= range.e.r; R++) {
+    for (let C = range.s.c; C <= range.e.c; C++) {
+      const cellAddress = XLSX.utils.encode_cell({ r: R, c: C })
+      const cell = sheet[cellAddress]
+      
+      if (cell && cell.v && typeof cell.v === 'string' && cell.v.trim() === 'Продано') {
+        cellsToColor.push({
+          cellAddress: cellAddress,
+          originalValue: cell.v
+        })
+      }
+    }
+  }
+  
+  console.log('🟢 Found', cellsToColor.length, 'cells with "Продано" to color green')
+  
+  if (hyperlinksToCreate.length === 0 && cellsToColor.length === 0) {
+    console.log('❌ No hyperlinks or colorable cells found - copying original file')
     fs.copyFileSync(inputFilePath, outputFilePath)
     return outputFilePath
   }
@@ -100,15 +120,39 @@ function convertToHyperlinks(inputFilePath, outputFilePath) {
     }
   }
 
+  // Apply green color to "Продано" cells
+  for (const colorData of cellsToColor) {
+    const { cellAddress, originalValue } = colorData
+    
+    console.log('🟢 Coloring cell:', cellAddress, '(', originalValue, ') -> green #a8d2a8')
+    
+    // Get existing cell or create new one
+    const existingCell = sheet[cellAddress] || {}
+    
+    // Apply green background color - preserve existing styles
+    const existingStyles = existingCell.s || {}
+    sheet[cellAddress] = {
+      ...existingCell,
+      v: originalValue,  // Keep original value
+      t: typeof originalValue === 'number' ? 'n' : 's',  // Preserve type
+      s: {              // Style object for green background
+        ...existingStyles,  // Keep existing styles
+        fill: {
+          fgColor: { rgb: 'A8D2A8' }  // Green color (xlsx-js-style format)
+        }
+      }
+    }
+  }
+
   // Write the new file using XLSX library (guaranteed MS Office compatibility)
   console.log('💾 Writing MS Office compatible file:', outputFilePath)
   
   XLSX.writeFile(workbook, outputFilePath, {
     bookType: 'xlsx',
-    type: 'binary',
-    cellStyles: true,
-    bookSST: true,  // Use shared strings table
-    compression: true
+    cellStyles: true,    // Critical for style preservation
+    type: 'buffer',      // Changed from binary to buffer
+    bookSST: true,       // Use shared strings table
+    compression: false   // Disable compression to avoid style corruption
   })
   
   console.log('✅ MS Office compatible conversion complete!')
