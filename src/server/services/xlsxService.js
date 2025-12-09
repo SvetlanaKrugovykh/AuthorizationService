@@ -35,11 +35,46 @@ module.exports.doConvertXlsx = async function (inputFilePath) {
   content = content.replace(/=HYPERLINK\("([^"]+)","([^"]+)"\)/g, '$2')
   fs.writeFileSync(sharedStringsPath, content, 'utf8')
 
-  // Create hyperlinks list for processing
-  const hyperlinksToAdd = []
-  for (const [marker, url] of Object.entries(hyperlinksMap)) {
-    hyperlinksToAdd.push({ marker, url })
+  // Read existing relationships and find max ID
+  const relsDir = path.join(tempDir, 'xl', 'worksheets', '_rels')
+  fs.mkdirSync(relsDir, { recursive: true })
+  const relsPath = path.join(relsDir, 'sheet1.xml.rels')
+  let existingRels = ''
+  let maxId = 0
+
+  if (fs.existsSync(relsPath)) {
+    existingRels = fs.readFileSync(relsPath, 'utf8')
+    const idMatches = existingRels.match(/Id="rId(\d+)"/g)
+    if (idMatches) {
+      idMatches.forEach(match => {
+        const num = parseInt(match.replace(/\D/g, ''))
+        if (num > maxId) maxId = num
+      })
+    }
   }
+
+  // Create relationship entries for all hyperlinks
+  let newRelsXml = ''
+  const hyperlinksToAdd = []
+  let nextId = maxId + 1
+
+  for (const [marker, url] of Object.entries(hyperlinksMap)) {
+    const relId = `rId${nextId}`
+    newRelsXml += `<Relationship Id="${relId}" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/hyperlink" Target="${url}" TargetMode="External"/>\n`
+    hyperlinksToAdd.push({ marker, relId, url })
+    nextId++
+  }
+
+  // Update or create relationships file
+  let relsContent
+  if (existingRels) {
+    relsContent = existingRels.replace('</Relationships>', newRelsXml + '</Relationships>')
+  } else {
+    relsContent = `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">
+${newRelsXml}</Relationships>`
+  }
+  fs.writeFileSync(relsPath, relsContent, 'utf8')
 
   // Find cells with hyperlink markers and build hyperlinks element
   const worksheetPath = path.join(tempDir, 'xl', 'worksheets', 'sheet1.xml')
@@ -78,7 +113,7 @@ module.exports.doConvertXlsx = async function (inputFilePath) {
           // Found the matching <si> block
           if (siMatch[0].includes(marker)) {
             // This cell contains our marker!
-            hyperlinkElements += `  <hyperlink ref="${cellRef}" location="${hyperlinksMap[marker]}"/>\n`
+            hyperlinkElements += `  <hyperlink ref="${cellRef}" r:id="${relId}"/>\n`
           }
           break
         }
@@ -87,7 +122,6 @@ module.exports.doConvertXlsx = async function (inputFilePath) {
     }
   }
 
-  // Add hyperlinks directly with location URLs
   if (hyperlinkElements) {
     const hyperlinks = `<hyperlinks>\n${hyperlinkElements}</hyperlinks>`
     worksheet = worksheet.replace(/(<\/worksheet>)$/m, hyperlinks + '\n$1')
@@ -98,6 +132,14 @@ module.exports.doConvertXlsx = async function (inputFilePath) {
   // Update files inside existing archive (preserves original structure and MS Office compatibility)  
   zip.updateFile('xl/sharedStrings.xml', Buffer.from(content, 'utf8'))
   zip.updateFile('xl/worksheets/sheet1.xml', Buffer.from(worksheet, 'utf8'))
+  
+  // Add or update relationships file
+  const relsFileInZip = 'xl/worksheets/_rels/sheet1.xml.rels'
+  if (zip.getEntry(relsFileInZip)) {
+    zip.updateFile(relsFileInZip, Buffer.from(relsContent, 'utf8'))
+  } else {
+    zip.addFile(relsFileInZip, Buffer.from(relsContent, 'utf8'))
+  }
 
   zip.writeZip(outputFilePath)
 
