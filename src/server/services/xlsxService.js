@@ -125,9 +125,14 @@ ${newRelsXml}</Relationships>`
 
   if (hyperlinkElements) {
     const hyperlinks = `<hyperlinks>\n${hyperlinkElements}</hyperlinks>`
-    // Insert hyperlinks before closing </worksheet> tag
-    // Make sure it's properly placed in XML structure
-    worksheet = worksheet.replace(/(<\/worksheet>)$/m, hyperlinks + '\n$1')
+    // Insert hyperlinks in correct XML position - after legacyDrawingHF, before worksheet closing tag
+    if (worksheet.includes('<legacyDrawingHF')) {
+      worksheet = worksheet.replace(/(<legacyDrawingHF[^>]*\/>)/, `$1\n${hyperlinks}`)
+    } else if (worksheet.includes('</sheetData>')) {
+      worksheet = worksheet.replace('</sheetData>', `</sheetData>\n${hyperlinks}`)
+    } else {
+      worksheet = worksheet.replace(/(<\/worksheet>)$/m, hyperlinks + '\n$1')
+    }
   }
 
   fs.writeFileSync(worksheetPath, worksheet, 'utf8')
