@@ -2,48 +2,60 @@
 
 [![License](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 
-Authorization Service is an simple service for users check.
+Simple authorization service with XLSX hyperlink conversion functionality.
+
+## Features
+
+- User authorization and authentication
+- XLSX hyperlink converter for MS Office compatibility
+- Google Drive API integration
+- File processing and validation
 
 ## XLSX Hyperlink Converter
 
-Преобразует Excel файлы из 1C с формулами HYPERLINK в файлы с кликабельными гиперссылками, совместимые с MS Office и LibreOffice.
+Converts Excel files with HYPERLINK formulas into files with clickable hyperlinks, compatible with both MS Office and LibreOffice.
 
-### Использование:
+### Usage
 
 ```javascript
 const xlsxService = require('./src/server/services/xlsxService.js');
 
-// Основной метод (автоматически выберет лучший способ конвертации)
+// Main method (automatically selects best conversion method)
 const result = await xlsxService.doConvertXlsx('path/to/input.xlsx');
 
-// Прямые методы
-const result1 = xlsxService.convertWithSheetJS('input.xlsx', 'output.xlsx'); // Рекомендуемый
+// Direct methods
+const result1 = xlsxService.convertWithSheetJS('input.xlsx', 'output.xlsx'); // Recommended
 const result2 = xlsxService.convertToHyperlinks('input.xlsx', 'output.xlsx'); // Fallback
 ```
 
-### Зависимости:
-- `xlsx` (SheetJS) - основная библиотека для максимальной MS Office совместимости
-- `adm-zip` - для работы с XLSX архивами
+### Dependencies
 
-### Особенности:
-- ✅ Динамическое извлечение гиперссылок из любых файлов
-- ✅ Поддержка MS Office и LibreOffice  
-- ✅ Сохранение всех данных из оригинального файла
-- ✅ Автоматический выбор наиболее совместимого метода конвертации
+- `xlsx` (SheetJS) - main library for maximum MS Office compatibility
+- `adm-zip` - for working with XLSX archives
 
-## Features
+### XLSX Converter Features
 
-- Make requests and return data ...
+- Dynamic hyperlink extraction from any files
+- MS Office and LibreOffice support  
+- Preserves all original file data
+- Automatic selection of most compatible conversion method
 
 ## Requirements
 
-- [UNIX)
-- [Node.js >= 18.x](https://nodejs.org/en/download/)
+- Node.js >= 18.x
+- npm or yarn package manager
 
 ## Installation
 
 1. Clone the repository:
 
    ```bash
-   git clone https://github.com/.../AuthorizationService.git
+   git clone https://github.com/SvetlanaKrugovykh/AuthorizationService.git
+   cd AuthorizationService
+   ```
+
+2. Install dependencies:
+
+   ```bash
+   npm install
    ```
