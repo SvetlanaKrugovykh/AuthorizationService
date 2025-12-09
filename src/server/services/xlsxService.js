@@ -80,6 +80,52 @@ ${newRelsXml}</Relationships>`
     }
   }
 
+  // STEP 2: Add hyperlinks block to worksheet
+  const worksheetPath = path.join(tempDir, 'xl', 'worksheets', 'sheet1.xml')
+  let worksheet = fs.readFileSync(worksheetPath, 'utf8')
+
+  // Find cells with hyperlink markers and build hyperlinks element
+  let hyperlinkElements = ''
+  let nextId = maxId + 1
+  
+  for (const [marker, url] of Object.entries(hyperlinksMap)) {
+    const relId = `rId${nextId}`
+    
+    // Find cells containing the marker text
+    const cellPattern = /<c r="([A-Z]+\d+)"[^>]*>[\s\S]*?<v>(\d+)<\/v>[\s\S]*?<\/c>/g
+    let cellMatch
+    
+    while ((cellMatch = cellPattern.exec(worksheet)) !== null) {
+      const cellRef = cellMatch[1]
+      const stringIndex = cellMatch[2]
+      
+      // Check if this index in sharedStrings contains our marker
+      const siPattern = /<si[^>]*>[\s\S]*?<\/si>/g
+      let siMatch
+      let siCount = 0
+      
+      while ((siMatch = siPattern.exec(content)) !== null) {
+        if (siCount === parseInt(stringIndex)) {
+          if (siMatch[0].includes(marker)) {
+            hyperlinkElements += `          <hyperlink ref="${cellRef}" r:id="${relId}"/>\n`
+          }
+          break
+        }
+        siCount++
+      }
+    }
+    nextId++
+  }
+
+  // Add hyperlinks block if we found any
+  if (hyperlinkElements) {
+    const hyperlinks = `        <hyperlinks>\n${hyperlinkElements}        </hyperlinks>`
+    worksheet = worksheet.replace(/(<legacyDrawingHF[^>]*\/>)/, `$1\n${hyperlinks}`)
+  }
+
+  fs.writeFileSync(worksheetPath, worksheet, 'utf8')
+  zip.updateFile('xl/worksheets/sheet1.xml', Buffer.from(worksheet, 'utf8'))
+
   zip.writeZip(outputFilePath)
 
   fs.rmSync(tempDir, { recursive: true, force: true })
