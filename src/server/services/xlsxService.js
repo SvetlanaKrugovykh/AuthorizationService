@@ -51,24 +51,19 @@ module.exports.doConvertXlsx = async function (inputFilePath) {
   )
   fs.writeFileSync(worksheetPath, worksheet, 'utf8')
 
-  // Recreate XLSX archive (platform-independent)
-  fs.unlinkSync(outputFilePath)
-
-  const newZip = new AdmZip()
-  function addDirToZip(dir, zipInstance, basePath = '') {
-    const items = fs.readdirSync(dir)
-    for (const item of items) {
-      const fullPath = path.join(dir, item)
-      const relPath = path.join(basePath, item)
-      if (fs.statSync(fullPath).isDirectory()) {
-        addDirToZip(fullPath, zipInstance, relPath)
-      } else {
-        zipInstance.addLocalFile(fullPath, path.dirname(relPath))
-      }
-    }
+  // Update files inside existing archive (preserves original structure and MS Office compatibility)
+  zip.updateFile('xl/sharedStrings.xml', Buffer.from(content, 'utf8'))
+  zip.updateFile('xl/worksheets/sheet1.xml', Buffer.from(worksheet, 'utf8'))
+  
+  // Add or update relationships file
+  const relsFileInZip = 'xl/worksheets/_rels/sheet1.xml.rels'
+  if (zip.getEntry(relsFileInZip)) {
+    zip.updateFile(relsFileInZip, Buffer.from(relsContent, 'utf8'))
+  } else {
+    zip.addFile(relsFileInZip, Buffer.from(relsContent, 'utf8'))
   }
-  addDirToZip(tempDir, newZip)
-  newZip.writeZip(outputFilePath)
+
+  zip.writeZip(outputFilePath)
 
   fs.rmSync(tempDir, { recursive: true, force: true })
 
