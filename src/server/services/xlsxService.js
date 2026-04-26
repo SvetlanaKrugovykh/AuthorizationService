@@ -45,18 +45,16 @@ function convertToHyperlinks(inputFilePath, outputFilePath) {
 
 			if (cell && cell.v) {
 				const cellValue = cell.v.toString()
-
 				if (cellValue.includes("=HYPERLINK(")) {
 					console.log(
 						"📎 Found HYPERLINK in value at",
 						cellAddress + ":",
 						cellValue.substring(0, 100) + "...",
 					)
-
 					const match = cellValue.match(/=HYPERLINK\("([^"]+)","([^"]+)"\)/)
 					if (match) {
 						hyperlinksToCreate.push({
-							cellAddress: cellAddress,
+							cellAddress,
 							url: match[1],
 							displayText: match[2],
 							row: R,
@@ -71,6 +69,44 @@ function convertToHyperlinks(inputFilePath, outputFilePath) {
 
 	console.log("🎯 Found", hyperlinksToCreate.length, "hyperlinks to create")
 
+	// ─── Helper: is this cell value a pure group number? (1, 2, 99, etc.) ───
+	function isGroupNumber(val) {
+		if (val === undefined || val === null || val === "") return false
+		const s = val.toString().trim()
+		return /^\d+$/.test(s) // only digits, no letters
+	}
+
+	// ─── First pass: identify group header rows and data row ranges ───────────
+	console.log("🔍 Detecting group structure...")
+
+	// We look at column A (index 0) — merged A-B means value lives in A
+	const groupHeaders = [] // { row, groupNum }
+
+	for (let R = range.s.r; R <= range.e.r; R++) {
+		const cellA = sheet[XLSX.utils.encode_cell({ r: R, c: 0 })]
+		const valA = cellA ? cellA.v : undefined
+		if (isGroupNumber(valA)) {
+			groupHeaders.push({ row: R, groupNum: Number(valA) })
+		}
+	}
+
+	console.log(
+		"📂 Found",
+		groupHeaders.length,
+		"groups:",
+		groupHeaders.map((g) => g.groupNum).join(", "),
+	)
+
+	// Build groups: each group owns rows from (headerRow+1) to (nextHeaderRow-1)
+	const groups = groupHeaders.map((g, i) => ({
+		headerRow: g.row,
+		groupNum: g.groupNum,
+		dataStart: g.row + 1,
+		dataEnd:
+			i + 1 < groupHeaders.length ? groupHeaders[i + 1].row - 1 : range.e.r,
+	}))
+
+	// ─── Scan cells for coloring ──────────────────────────────────────────────
 	console.log("🎨 Scanning cells...")
 	const cellsToColor = []
 	const cellsVilno = []
@@ -90,7 +126,6 @@ function convertToHyperlinks(inputFilePath, outputFilePath) {
 			) {
 				cellsToColor.push({ cellAddress, originalValue: cell.v })
 			}
-
 			if (
 				cell &&
 				cell.v &&
@@ -99,11 +134,9 @@ function convertToHyperlinks(inputFilePath, outputFilePath) {
 			) {
 				cellsVilno.push({ cellAddress, originalValue: cell.v })
 			}
-
 			if (C === 2 || C === 3) {
 				cellsNpunkt.push({ cellAddress, cell })
 			}
-
 			if (C === 11) {
 				cellsGps.push({ cellAddress, cell })
 			}
@@ -118,109 +151,150 @@ function convertToHyperlinks(inputFilePath, outputFilePath) {
 	if (
 		hyperlinksToCreate.length === 0 &&
 		cellsToColor.length === 0 &&
-		cellsVilno.length === 0
+		cellsVilno.length === 0 &&
+		groups.length === 0
 	) {
-		console.log(
-			"❌ No hyperlinks or colorable cells found - copying original file",
-		)
+		console.log("❌ Nothing to process - copying original file")
 		fs.copyFileSync(inputFilePath, outputFilePath)
 		return outputFilePath
 	}
 
-	// Convert formulas to actual hyperlinks
-	for (const hyperlinkData of hyperlinksToCreate) {
-		const { cellAddress, url, displayText } = hyperlinkData
+	// ─── Convert hyperlinks ───────────────────────────────────────────────────
+	for (const { cellAddress, url, displayText } of hyperlinksToCreate) {
 		console.log("🔗 Creating hyperlink:", cellAddress, "->", url)
 		sheet[cellAddress] = {
 			v: displayText,
 			t: "s",
-			l: {
-				Target: url,
-				Tooltip: displayText,
-			},
+			l: { Target: url, Tooltip: displayText },
 		}
 	}
 
-	// Apply green color to "Продано" cells
-	for (const colorData of cellsToColor) {
-		const { cellAddress, originalValue } = colorData
+	// ─── Color "Продано" green ────────────────────────────────────────────────
+	for (const { cellAddress, originalValue } of cellsToColor) {
 		console.log("🟢 Coloring cell:", cellAddress, "-> green #a8d2a8")
 		const existingCell = sheet[cellAddress] || {}
-		const existingStyles = existingCell.s || {}
 		sheet[cellAddress] = {
 			...existingCell,
 			v: originalValue,
 			t: typeof originalValue === "number" ? "n" : "s",
 			s: {
-				...existingStyles,
+				...(existingCell.s || {}),
 				fill: { fgColor: { rgb: "A8D2A8" } },
 			},
 		}
 	}
 
-	// Apply grey color to "Вільно" cells
-	for (const colorData of cellsVilno) {
-		const { cellAddress, originalValue } = colorData
+	// ─── Color "Вільно" grey ──────────────────────────────────────────────────
+	for (const { cellAddress, originalValue } of cellsVilno) {
 		console.log("⬜ Coloring cell:", cellAddress, "-> grey #ebebeb")
 		const existingCell = sheet[cellAddress] || {}
-		const existingStyles = existingCell.s || {}
 		sheet[cellAddress] = {
 			...existingCell,
 			v: originalValue,
 			t: "s",
 			s: {
-				...existingStyles,
+				...(existingCell.s || {}),
 				fill: { fgColor: { rgb: "EBEBEB" } },
 			},
 		}
 	}
 
-	// Apply light blue + wrap to columns C and D
-	for (const npunkt of cellsNpunkt) {
-		const { cellAddress, cell } = npunkt
+	// ─── Light blue + wrap for columns C/D ───────────────────────────────────
+	for (const { cellAddress, cell } of cellsNpunkt) {
+		if (!cell) continue
 		console.log(
 			"🔵 Coloring cell:",
 			cellAddress,
 			"-> light blue #ccffff + wrap",
 		)
-		const existingCell = cell || {}
-		const existingStyles = existingCell.s || {}
 		sheet[cellAddress] = {
-			...existingCell,
-			v: existingCell.v !== undefined ? existingCell.v : "",
-			t: existingCell.t || "s",
+			...cell,
 			s: {
-				...existingStyles,
+				...(cell.s || {}),
 				fill: { fgColor: { rgb: "CCFFFF" } },
-				alignment: {
-					...(existingStyles.alignment || {}),
-					wrapText: true,
-				},
+				alignment: { ...(cell.s?.alignment || {}), wrapText: true },
 			},
 		}
 	}
 
-	// Apply wrap only to column L (GPS)
-	for (const gps of cellsGps) {
-		const { cellAddress, cell } = gps
+	// ─── Wrap only for column L (GPS) ────────────────────────────────────────
+	for (const { cellAddress, cell } of cellsGps) {
+		if (!cell) continue
 		console.log("📍 Wrapping cell:", cellAddress, "-> wrapText")
-		const existingCell = cell || {}
-		const existingStyles = existingCell.s || {}
 		sheet[cellAddress] = {
-			...existingCell,
-			v: existingCell.v !== undefined ? existingCell.v : "",
-			t: existingCell.t || "s",
+			...cell,
 			s: {
-				...existingStyles,
-				alignment: {
-					...(existingStyles.alignment || {}),
-					wrapText: true,
-				},
+				...(cell.s || {}),
+				alignment: { ...(cell.s?.alignment || {}), wrapText: true },
 			},
 		}
 	}
 
-	// Set column widths — fix column L (GPS, index 11) to fit "50.3883571," + 3 chars
+	// ─── Color group header rows (C-L) with #f2e297 ──────────────────────────
+	console.log("🟡 Applying group header colors...")
+	for (const group of groups) {
+		const R = group.headerRow
+		console.log(
+			"🟡 Group",
+			group.groupNum,
+			"- coloring header row",
+			R + 1,
+			"(columns C-L)",
+		)
+
+		// Color columns C through L (indices 2–11) in the header row
+		for (let C = 2; C <= 11; C++) {
+			const cellAddress = XLSX.utils.encode_cell({ r: R, c: C })
+			const existingCell = sheet[cellAddress] || {}
+			sheet[cellAddress] = {
+				...existingCell,
+				v: existingCell.v !== undefined ? existingCell.v : "",
+				t: existingCell.t || "s",
+				s: {
+					...(existingCell.s || {}),
+					fill: { fgColor: { rgb: "F2E297" } },
+				},
+			}
+		}
+	}
+
+	// ─── Set Excel row groupings (outline) ───────────────────────────────────
+	// Excel groupings live in sheet['!rows'] as { level, hidden } per row index
+	// Header row = outside group (level 0), data rows = level 1, expanded
+	console.log("📊 Setting Excel row groupings...")
+
+	const totalRows = range.e.r + 1
+	const rowsMeta = sheet["!rows"] ? [...sheet["!rows"]] : []
+
+	// Ensure array is long enough
+	while (rowsMeta.length < totalRows) rowsMeta.push(undefined)
+
+	for (const group of groups) {
+		console.log(
+			"📊 Group",
+			group.groupNum,
+			"- data rows",
+			group.dataStart + 1,
+			"to",
+			group.dataEnd + 1,
+			"(Excel rows",
+			group.dataStart + 1,
+			"-",
+			group.dataEnd + 1,
+			")",
+		)
+		for (let R = group.dataStart; R <= group.dataEnd; R++) {
+			rowsMeta[R] = {
+				...(rowsMeta[R] || {}),
+				level: 1, // outline level 1
+				hidden: false, // expanded (not collapsed)
+			}
+		}
+	}
+
+	sheet["!rows"] = rowsMeta
+
+	// ─── Column widths ────────────────────────────────────────────────────────
 	const colsCount = range.e.c + 1
 	const existingCols = sheet["!cols"] || []
 	const cols = Array.from(
@@ -231,6 +305,7 @@ function convertToHyperlinks(inputFilePath, outputFilePath) {
 	sheet["!cols"] = cols
 	console.log("📐 Set column L width to 15 chars")
 
+	// ─── Write file ───────────────────────────────────────────────────────────
 	console.log("💾 Writing MS Office compatible file:", outputFilePath)
 
 	XLSX.writeFile(workbook, outputFilePath, {
@@ -242,18 +317,15 @@ function convertToHyperlinks(inputFilePath, outputFilePath) {
 	})
 
 	console.log("✅ MS Office compatible conversion complete!")
-
 	return outputFilePath
 }
 
-// Async wrapper for backward compatibility
 module.exports.doConvertXlsx = async function (inputFilePath) {
 	const originalFile = inputFilePath
 	const outDir = process.env.XLSX_OUT || path.join(__dirname, "../../temp")
 	if (!fs.existsSync(outDir)) fs.mkdirSync(outDir, { recursive: true })
 	const outputFileName = path.basename(originalFile)
 	const outputFilePath = path.join(outDir, outputFileName)
-
 	return convertToHyperlinks(originalFile, outputFilePath)
 }
 
