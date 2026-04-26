@@ -1,12 +1,7 @@
 const fs = require("fs")
 const path = require("path")
-const XLSX = require("xlsx-js-style") // Используем форк с поддержкой стилей!
+const XLSX = require("xlsx-js-style")
 
-/**
- * MS Office compatible XLSX hyperlink converter
- * Uses professional XLSX library for guaranteed compatibility
- * Converts HYPERLINK formulas from 1C to real clickable hyperlinks
- */
 function convertToHyperlinks(inputFilePath, outputFilePath) {
 	console.log("🚀 Starting MS Office compatible conversion...")
 
@@ -17,13 +12,11 @@ function convertToHyperlinks(inputFilePath, outputFilePath) {
 		outputFilePath = path.join(outDir, outputFileName)
 	}
 
-	// Ensure output directory exists
 	const outDir = path.dirname(outputFilePath)
 	if (!fs.existsSync(outDir)) fs.mkdirSync(outDir, { recursive: true })
 
 	console.log("📖 Reading file:", inputFilePath)
 
-	// Read the workbook with XLSX library (MS Office compatible)
 	const workbook = XLSX.readFile(inputFilePath, {
 		cellHTML: false,
 		cellNF: false,
@@ -40,7 +33,6 @@ function convertToHyperlinks(inputFilePath, outputFilePath) {
 
 	console.log("📏 Sheet range:", sheet["!ref"])
 
-	// Find all cells that need hyperlink conversion
 	const hyperlinksToCreate = []
 	const range = XLSX.utils.decode_range(sheet["!ref"])
 
@@ -54,7 +46,6 @@ function convertToHyperlinks(inputFilePath, outputFilePath) {
 			if (cell && cell.v) {
 				const cellValue = cell.v.toString()
 
-				// Check if cell value contains HYPERLINK formula (1C saves them as values!)
 				if (cellValue.includes("=HYPERLINK(")) {
 					console.log(
 						"📎 Found HYPERLINK in value at",
@@ -62,7 +53,6 @@ function convertToHyperlinks(inputFilePath, outputFilePath) {
 						cellValue.substring(0, 100) + "...",
 					)
 
-					// Parse HYPERLINK formula: =HYPERLINK("url","display_text")
 					const match = cellValue.match(/=HYPERLINK\("([^"]+)","([^"]+)"\)/)
 					if (match) {
 						hyperlinksToCreate.push({
@@ -81,17 +71,11 @@ function convertToHyperlinks(inputFilePath, outputFilePath) {
 
 	console.log("🎯 Found", hyperlinksToCreate.length, "hyperlinks to create")
 
-	// Scan for cells with "Продано" text to color green
-	console.log('🎨 Scanning for "Продано" cells to color green...')
+	console.log("🎨 Scanning cells...")
 	const cellsToColor = []
-
-	// Scan for cells with "Вільно" text to color light grey
-	console.log('🎨 Scanning for "Вільно" cells to color grey...')
 	const cellsVilno = []
-
-	// Collect all cells in columns C (index 2) and D (index 3) for light blue
-	console.log("🎨 Collecting columns C and D for light blue...")
 	const cellsNpunkt = []
+	const cellsGps = []
 
 	for (let R = range.s.r; R <= range.e.r; R++) {
 		for (let C = range.s.c; C <= range.e.c; C++) {
@@ -104,10 +88,7 @@ function convertToHyperlinks(inputFilePath, outputFilePath) {
 				typeof cell.v === "string" &&
 				cell.v.trim() === "Продано"
 			) {
-				cellsToColor.push({
-					cellAddress: cellAddress,
-					originalValue: cell.v,
-				})
+				cellsToColor.push({ cellAddress, originalValue: cell.v })
 			}
 
 			if (
@@ -116,37 +97,23 @@ function convertToHyperlinks(inputFilePath, outputFilePath) {
 				typeof cell.v === "string" &&
 				cell.v.trim() === "Вільно"
 			) {
-				cellsVilno.push({
-					cellAddress: cellAddress,
-					originalValue: cell.v,
-				})
+				cellsVilno.push({ cellAddress, originalValue: cell.v })
 			}
 
-			// Columns C and D = indices 2 and 3
 			if (C === 2 || C === 3) {
-				cellsNpunkt.push({
-					cellAddress: cellAddress,
-					cell: cell, // may be undefined for empty cells
-				})
+				cellsNpunkt.push({ cellAddress, cell })
+			}
+
+			if (C === 11) {
+				cellsGps.push({ cellAddress, cell })
 			}
 		}
 	}
 
-	console.log(
-		"🟢 Found",
-		cellsToColor.length,
-		'cells with "Продано" to color green',
-	)
-	console.log(
-		"⬜ Found",
-		cellsVilno.length,
-		'cells with "Вільно" to color grey',
-	)
-	console.log(
-		"🔵 Found",
-		cellsNpunkt.length,
-		"cells in columns C/D for light blue",
-	)
+	console.log("🟢 Found", cellsToColor.length, 'cells with "Продано"')
+	console.log("⬜ Found", cellsVilno.length, 'cells with "Вільно"')
+	console.log("🔵 Found", cellsNpunkt.length, "cells in columns C/D")
+	console.log("📍 Found", cellsGps.length, "cells in column L (GPS)")
 
 	if (
 		hyperlinksToCreate.length === 0 &&
@@ -160,18 +127,14 @@ function convertToHyperlinks(inputFilePath, outputFilePath) {
 		return outputFilePath
 	}
 
-	// Convert formulas to actual hyperlinks using XLSX library
+	// Convert formulas to actual hyperlinks
 	for (const hyperlinkData of hyperlinksToCreate) {
 		const { cellAddress, url, displayText } = hyperlinkData
-
 		console.log("🔗 Creating hyperlink:", cellAddress, "->", url)
-
-		// Replace the formula with the display text and hyperlink
 		sheet[cellAddress] = {
-			v: displayText, // Display value
-			t: "s", // String type
+			v: displayText,
+			t: "s",
 			l: {
-				// Link object - MS Office compatible
 				Target: url,
 				Tooltip: displayText,
 			},
@@ -181,30 +144,16 @@ function convertToHyperlinks(inputFilePath, outputFilePath) {
 	// Apply green color to "Продано" cells
 	for (const colorData of cellsToColor) {
 		const { cellAddress, originalValue } = colorData
-
-		console.log(
-			"🟢 Coloring cell:",
-			cellAddress,
-			"(",
-			originalValue,
-			") -> green #a8d2a8",
-		)
-
-		// Get existing cell or create new one
+		console.log("🟢 Coloring cell:", cellAddress, "-> green #a8d2a8")
 		const existingCell = sheet[cellAddress] || {}
-
-		// Apply green background color - preserve existing styles
 		const existingStyles = existingCell.s || {}
 		sheet[cellAddress] = {
 			...existingCell,
-			v: originalValue, // Keep original value
-			t: typeof originalValue === "number" ? "n" : "s", // Preserve type
+			v: originalValue,
+			t: typeof originalValue === "number" ? "n" : "s",
 			s: {
-				// Style object for green background
-				...existingStyles, // Keep existing styles
-				fill: {
-					fgColor: { rgb: "A8D2A8" }, // Green color (xlsx-js-style format)
-				},
+				...existingStyles,
+				fill: { fgColor: { rgb: "A8D2A8" } },
 			},
 		}
 	}
@@ -212,13 +161,7 @@ function convertToHyperlinks(inputFilePath, outputFilePath) {
 	// Apply grey color to "Вільно" cells
 	for (const colorData of cellsVilno) {
 		const { cellAddress, originalValue } = colorData
-		console.log(
-			"⬜ Coloring cell:",
-			cellAddress,
-			"(",
-			originalValue,
-			") -> grey #ebebeb",
-		)
+		console.log("⬜ Coloring cell:", cellAddress, "-> grey #ebebeb")
 		const existingCell = sheet[cellAddress] || {}
 		const existingStyles = existingCell.s || {}
 		sheet[cellAddress] = {
@@ -227,17 +170,19 @@ function convertToHyperlinks(inputFilePath, outputFilePath) {
 			t: "s",
 			s: {
 				...existingStyles,
-				fill: {
-					fgColor: { rgb: "EBEBEB" },
-				},
+				fill: { fgColor: { rgb: "EBEBEB" } },
 			},
 		}
 	}
 
-	// Apply light blue to all cells in columns C and D
+	// Apply light blue + wrap to columns C and D
 	for (const npunkt of cellsNpunkt) {
 		const { cellAddress, cell } = npunkt
-		console.log("🔵 Coloring cell:", cellAddress, "-> light blue #ccffff")
+		console.log(
+			"🔵 Coloring cell:",
+			cellAddress,
+			"-> light blue #ccffff + wrap",
+		)
 		const existingCell = cell || {}
 		const existingStyles = existingCell.s || {}
 		sheet[cellAddress] = {
@@ -246,22 +191,54 @@ function convertToHyperlinks(inputFilePath, outputFilePath) {
 			t: existingCell.t || "s",
 			s: {
 				...existingStyles,
-				fill: {
-					fgColor: { rgb: "CCFFFF" },
+				fill: { fgColor: { rgb: "CCFFFF" } },
+				alignment: {
+					...(existingStyles.alignment || {}),
+					wrapText: true,
 				},
 			},
 		}
 	}
 
-	// Write the new file using XLSX library (guaranteed MS Office compatibility)
+	// Apply wrap only to column L (GPS)
+	for (const gps of cellsGps) {
+		const { cellAddress, cell } = gps
+		console.log("📍 Wrapping cell:", cellAddress, "-> wrapText")
+		const existingCell = cell || {}
+		const existingStyles = existingCell.s || {}
+		sheet[cellAddress] = {
+			...existingCell,
+			v: existingCell.v !== undefined ? existingCell.v : "",
+			t: existingCell.t || "s",
+			s: {
+				...existingStyles,
+				alignment: {
+					...(existingStyles.alignment || {}),
+					wrapText: true,
+				},
+			},
+		}
+	}
+
+	// Set column widths — fix column L (GPS, index 11) to fit "50.3883571," + 3 chars
+	const colsCount = range.e.c + 1
+	const existingCols = sheet["!cols"] || []
+	const cols = Array.from(
+		{ length: colsCount },
+		(_, i) => existingCols[i] || {},
+	)
+	cols[11] = { ...cols[11], wch: 15 }
+	sheet["!cols"] = cols
+	console.log("📐 Set column L width to 15 chars")
+
 	console.log("💾 Writing MS Office compatible file:", outputFilePath)
 
 	XLSX.writeFile(workbook, outputFilePath, {
 		bookType: "xlsx",
-		cellStyles: true, // Critical for style preservation
-		type: "buffer", // Changed from binary to buffer
-		bookSST: true, // Use shared strings table
-		compression: false, // Disable compression to avoid style corruption
+		cellStyles: true,
+		type: "buffer",
+		bookSST: true,
+		compression: false,
 	})
 
 	console.log("✅ MS Office compatible conversion complete!")
@@ -280,8 +257,5 @@ module.exports.doConvertXlsx = async function (inputFilePath) {
 	return convertToHyperlinks(originalFile, outputFilePath)
 }
 
-// Main export - MS Office compatible version
 module.exports.convertToHyperlinks = convertToHyperlinks
-
-// Additional exports for compatibility
 module.exports.convertToHyperlinksV2 = convertToHyperlinks
