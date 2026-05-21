@@ -24,5 +24,6 @@ app.register(authPlugin)
 // Register routes
 app.register(require('./routes/auth.route'), { prefix: '/api' })
 app.register(require('./routes/links.route'), { prefix: '/api/link' })
+app.register(require('./routes/xml.processing.route'), { prefix: '/api/xml' })
 
 module.exports = { app }
