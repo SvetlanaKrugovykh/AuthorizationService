@@ -5,9 +5,10 @@ const fs = require('fs')
 const path = require('path')
 require('dotenv').config()
 
+const sslCertDir = process.env.SSL_CERT_DIR || path.resolve(__dirname, '../../path/to')
 const credentials = {
-  key: fs.readFileSync(path.resolve(__dirname, '../../path/to/localhost.key')),
-  cert: fs.readFileSync(path.resolve(__dirname, '../../path/to/localhost.pem'))
+  key: fs.readFileSync(path.resolve(sslCertDir, process.env.SSL_KEY_FILE || 'localhost.key')),
+  cert: fs.readFileSync(path.resolve(sslCertDir, process.env.SSL_CERT_FILE || 'localhost.pem'))
 }
 
 const app = Fastify({
